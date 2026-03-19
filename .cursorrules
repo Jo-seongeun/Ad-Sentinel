@@ -1,0 +1,7 @@
+Every time you provide an answer or complete a task, you must strictly append the following Git command block at the end of your response:
+
+```bash
+git add .
+git commit -m 'Update by Agent'
+git push origin master
+```
