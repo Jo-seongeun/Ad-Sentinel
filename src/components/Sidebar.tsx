@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
     LayoutDashboard,
     Activity,
@@ -11,16 +11,36 @@ import {
     ShieldCheck,
     LogOut
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { createClient } from '@/utils/supabase/client';
 
 type Role = 'SUPER_ADMIN' | 'MANAGER' | 'MEMBER';
 
 export default function Sidebar() {
     const pathname = usePathname();
+    const router = useRouter();
+    const supabase = createClient();
+
+    // Auth State
+    const [userEmail, setUserEmail] = useState<string>('Loading...');
 
     // Mock User State for demonstration (Toggle this to Test Roles)
     const [role, setRole] = useState<Role>('SUPER_ADMIN');
-    const userEmail = role === 'SUPER_ADMIN' ? 'admin@adsentinel.com' : role === 'MANAGER' ? 'manager@adsentinel.com' : 'member@adsentinel.com';
+
+    useEffect(() => {
+        const fetchUser = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user?.email) {
+                setUserEmail(user.email);
+            }
+        };
+        fetchUser();
+    }, [supabase]);
+
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
+        router.refresh(); // will trigger layout's auth check and redirect to /login
+    };
 
     const menuItems = [
         { name: '대시보드', href: '/', icon: LayoutDashboard, roles: ['SUPER_ADMIN', 'MANAGER', 'MEMBER'] },
@@ -78,8 +98,8 @@ export default function Sidebar() {
                             key={item.href}
                             href={item.href}
                             className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${isActive
-                                    ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400'
-                                    : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/50 dark:hover:text-zinc-100'
+                                ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400'
+                                : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/50 dark:hover:text-zinc-100'
                                 }`}
                         >
                             <item.icon className="w-5 h-5" />
@@ -106,7 +126,10 @@ export default function Sidebar() {
                         </span>
                     </div>
                 </div>
-                <button className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-lg transition-colors">
+                <button
+                    onClick={handleLogout}
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-lg transition-colors"
+                >
                     <LogOut className="w-4 h-4" />
                     로그아웃
                 </button>
