@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ArrowRight, Check, Search, ShieldAlert } from 'lucide-react';
+import { ArrowRight, Check, Search, ShieldAlert, Cable } from 'lucide-react';
 
 interface AdAccount {
     id: string;
@@ -114,8 +114,8 @@ export default function AccountMappingPage() {
                                         key={acc.id}
                                         onClick={() => toggleAccountSelection(acc.id)}
                                         className={`flex items-start gap-3 p-3 rounded-lg cursor-pointer transition-colors border ${isSelected
-                                                ? 'bg-indigo-50 border-indigo-200 dark:bg-indigo-500/10 dark:border-indigo-500/30'
-                                                : 'border-transparent hover:bg-zinc-50 dark:hover:bg-zinc-800/50'
+                                            ? 'bg-indigo-50 border-indigo-200 dark:bg-indigo-500/10 dark:border-indigo-500/30'
+                                            : 'border-transparent hover:bg-zinc-50 dark:hover:bg-zinc-800/50'
                                             }`}
                                     >
                                         <div className="mt-0.5">
@@ -186,8 +186,8 @@ export default function AccountMappingPage() {
                                         key={team.id}
                                         onClick={() => setSelectedTeam(team.id)}
                                         className={`p-4 rounded-xl border-2 transition-all cursor-pointer ${isSelected
-                                                ? 'border-indigo-600 bg-indigo-50/50 dark:bg-indigo-500/10'
-                                                : 'border-zinc-200 dark:border-zinc-700 hover:border-indigo-300 hover:shadow-sm'
+                                            ? 'border-indigo-600 bg-indigo-50/50 dark:bg-indigo-500/10'
+                                            : 'border-zinc-200 dark:border-zinc-700 hover:border-indigo-300 hover:shadow-sm'
                                             }`}
                                     >
                                         <div className="flex justify-between items-center mb-2">
