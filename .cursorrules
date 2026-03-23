@@ -1,7 +1,9 @@
-Every time you provide an answer or complete a task, you must strictly append the following Git command block at the end of your response:
+Every time you provide an answer that involves code changes or task completion, you must append a Git command block at the end of your response. 
 
+The commit message must be a concise summary of the actual changes you made, written in Korean. 
+
+Strictly follow this format:
 ```bash
 git add .
-git commit -m '업데이트: 팀 생성 및 유저 권한 관리 UI와 Supabase DB 연동 로직 구현'
+git commit -m '업데이트: [여기에 수정된 내용을 한글로 요약해서 넣으세요]'
 git push origin master
-```

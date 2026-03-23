@@ -7,8 +7,6 @@ import { createClient } from '@/utils/supabase/server'
 export async function login(formData: FormData) {
     const supabase = await createClient()
 
-    // type-casting here for convenience
-    // in practice, you should validate your inputs
     const data = {
         email: formData.get('email') as string,
         password: formData.get('password') as string,
@@ -17,7 +15,8 @@ export async function login(formData: FormData) {
     const { error } = await supabase.auth.signInWithPassword(data)
 
     if (error) {
-        redirect('/login?message=Could not authenticate user')
+        // Encode the actual error message dynamically
+        redirect(`/login?message=${encodeURIComponent(error.message)}`)
     }
 
     revalidatePath('/', 'layout')
@@ -32,10 +31,16 @@ export async function signup(formData: FormData) {
         password: formData.get('password') as string,
     }
 
-    const { error } = await supabase.auth.signUp(data)
+    const { error, data: authData } = await supabase.auth.signUp(data)
 
     if (error) {
-        redirect('/login?message=Could not authenticate user')
+        redirect(`/login?message=${encodeURIComponent(error.message)}`)
+    }
+
+    // If Supabase confirms the user was created but there's no active session,
+    // it inherently means 'Confirm email' is required by Supabase auth settings.
+    if (authData.user && !authData.session) {
+        redirect('/login?message=회원가입 완료! 이메일 주소를 인증해주세요.')
     }
 
     revalidatePath('/', 'layout')
