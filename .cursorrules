@@ -2,6 +2,6 @@ Every time you provide an answer or complete a task, you must strictly append th
 
 ```bash
 git add .
-git commit -m 'Update: Account Mapping UI with filters, unassign feature, and team lists'
+git commit -m '업데이트: 팀 생성 및 유저 권한 관리 UI와 Supabase DB 연동 로직 구현'
 git push origin master
 ```

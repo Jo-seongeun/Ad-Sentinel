@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 
 export async function GET() {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     // 1. Check authentication status
     const { data: { user }, error: userError } = await supabase.auth.getUser()

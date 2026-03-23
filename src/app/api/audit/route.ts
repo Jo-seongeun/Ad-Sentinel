@@ -84,7 +84,7 @@ export async function POST(request: Request) {
 
             // Check UTM
             if (plan.utm_parameters) {
-                const requiredUtms = plan.utm_parameters.split('&').map(u => u.split('=')[0]);
+                const requiredUtms = plan.utm_parameters.split('&').map((u: string) => u.split('=')[0]);
                 for (const reqUtm of requiredUtms) {
                     if (!liveData.live_url.includes(reqUtm)) {
                         auditLogs.push({
