@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google';
 import Sidebar from '@/components/Sidebar';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/utils/supabase/server';
+import { headers } from 'next/headers';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -21,6 +22,21 @@ export default async function DashboardLayout({
 
     if (!user) {
         redirect('/login');
+    }
+
+    // Role Fetching
+    const { data } = await supabase.from('users').select('role').eq('id', user.id).single();
+    const role = data?.role || 'GUEST';
+
+    // Route Guard
+    const headerList = await headers();
+    const pathname = headerList.get('x-pathname') || '';
+
+    if (role === 'GUEST' && !pathname.startsWith('/sample')) {
+        redirect('/sample');
+    }
+    if (role !== 'GUEST' && pathname.startsWith('/sample')) {
+        redirect('/active');
     }
 
     return (

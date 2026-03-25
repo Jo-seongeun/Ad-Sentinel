@@ -9,7 +9,8 @@ import {
     Cable,
     Users,
     ShieldCheck,
-    LogOut
+    LogOut,
+    UserCheck
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
@@ -43,11 +44,12 @@ export default function Sidebar() {
     };
 
     const menuItems = [
-        { name: '대시보드', href: '/', icon: LayoutDashboard, roles: ['SUPER_ADMIN', 'MANAGER', 'MEMBER'] },
-        { name: '실시간 검수 센터', href: '/audit', icon: Activity, roles: ['SUPER_ADMIN', 'MANAGER', 'MEMBER'] },
-        { name: '검수 히스토리', href: '/history', icon: History, roles: ['SUPER_ADMIN', 'MANAGER', 'MEMBER'] },
-        { name: '매체 연동 관리', href: '/settings/media', icon: Cable, roles: ['SUPER_ADMIN'] },
-        { name: '연결 계정 관리', href: '/settings/accounts', icon: Users, roles: ['SUPER_ADMIN', 'MANAGER'] },
+        { name: '대시보드', href: '/active', icon: LayoutDashboard, roles: ['SUPER_ADMIN', 'ADMIN', 'TEAM_MANAGER', 'MEMBER'] },
+        { name: '실시간 검수 센터', href: '/audit', icon: Activity, roles: ['SUPER_ADMIN', 'ADMIN', 'TEAM_MANAGER', 'MEMBER'] },
+        { name: '검수 히스토리', href: '/history', icon: History, roles: ['SUPER_ADMIN', 'ADMIN', 'TEAM_MANAGER', 'MEMBER'] },
+        { name: '가입 승인 관리', href: '/settings/users', icon: UserCheck, roles: ['SUPER_ADMIN', 'ADMIN'] },
+        { name: '매체 연동 관리', href: '/settings/media', icon: Cable, roles: ['SUPER_ADMIN', 'ADMIN'] },
+        { name: '연결 계정 관리', href: '/settings/accounts', icon: Users, roles: ['SUPER_ADMIN', 'ADMIN', 'TEAM_MANAGER'] },
     ];
 
     // Filter based on role
