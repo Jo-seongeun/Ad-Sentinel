@@ -20,25 +20,39 @@ export default async function AccountMappingPage() {
     let initialAccounts: AdAccount[] = [];
     let metaApiError = null;
 
-    // 4. Fetch Meta Ad Accounts from Live API
+    // 4. Fetch ALL Meta Ad Accounts from Live API (Handling Cursor Pagination)
     if (metaToken) {
         try {
-            const res = await fetch(`https://graph.facebook.com/v19.0/me/adaccounts?fields=name,account_id&limit=100&access_token=${metaToken}`, { cache: 'no-store' });
-            const data = await res.json();
+            let nextUrl: string | null = `https://graph.facebook.com/v19.0/me/adaccounts?fields=name,account_id&limit=500&access_token=${metaToken}`;
+            let fetchedCount = 0;
 
-            if (data.error) {
-                metaApiError = data.error.message;
-            } else if (data.data) {
-                data.data.forEach((acc: any) => {
-                    // check if it's already mapped
-                    const mappedInfo = mappings.find(m => m.ad_account_id === acc.id && m.platform === 'META');
-                    initialAccounts.push({
-                        id: acc.id, // e.g. "act_1012356"
-                        name: acc.name || `Meta Account (${acc.account_id})`,
-                        platform: 'META',
-                        assignedTeamId: mappedInfo ? mappedInfo.team_id : null
+            while (nextUrl) {
+                const response = await fetch(nextUrl, { cache: 'no-store' });
+                const metaData: any = await response.json();
+
+                if (metaData.error) {
+                    metaApiError = metaData.error.message;
+                    break;
+                }
+
+                if (metaData.data && Array.isArray(metaData.data)) {
+                    fetchedCount += metaData.data.length;
+                    metaData.data.forEach((acc: any) => {
+                        const mappedInfo = mappings.find(m => m.ad_account_id === acc.id && m.platform === 'META');
+                        initialAccounts.push({
+                            id: acc.id,
+                            name: acc.name || `Meta Account (${acc.account_id})`,
+                            platform: 'META',
+                            assignedTeamId: mappedInfo ? mappedInfo.team_id : null
+                        });
                     });
-                });
+                }
+
+                // Protect against infinite loops or excessive API calls (e.g. capping at 10,000 to prevent timeouts)
+                if (fetchedCount > 10000) break;
+
+                // Get the next page URL
+                nextUrl = metaData.paging?.next || null;
             }
         } catch (e: any) {
             metaApiError = e.message;
