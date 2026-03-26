@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { Users, Trash2, MailPlus, UserCog } from 'lucide-react';
 import { inviteMemberAction, updateMemberAction, deleteMemberAction } from './actions';
+import DeleteButton from './DeleteButton';
 
 export default async function MembersPage() {
     const supabase = await createClient();
@@ -158,9 +159,7 @@ export default async function MembersPage() {
                                             {member.id !== myUser.id ? (
                                                 <form action={deleteMemberAction}>
                                                     <input type="hidden" name="userId" value={member.id} />
-                                                    <button type="submit" title="유저 삭제" className="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors inline-block" onClick={(e) => { if (!confirm('이 유저를 영구 삭제하시겠습니까? 복구할 수 없습니다.')) e.preventDefault(); }}>
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
+                                                    <DeleteButton />
                                                 </form>
                                             ) : (
                                                 <span className="text-xs text-zinc-400 font-medium px-2">(본인)</span>
