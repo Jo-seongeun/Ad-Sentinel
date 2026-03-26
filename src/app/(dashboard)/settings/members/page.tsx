@@ -112,16 +112,19 @@ export default async function MembersPage() {
                                     </td>
                                     <td className="px-6 py-4">
                                         {isAdmin && member.id !== myUser.id ? (
-                                            <form action={updateMemberAction}>
+                                            <form action={updateMemberAction} className="flex gap-2 items-center">
                                                 <input type="hidden" name="userId" value={member.id} />
                                                 <input type="hidden" name="teamId" value={member.team_id || ''} />
-                                                <select name="role" defaultValue={member.role} onChange={(e) => e.target.form?.requestSubmit()} className="p-1.5 text-xs font-medium border rounded bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 outline-none text-zinc-700 dark:text-zinc-300">
+                                                <select name="role" defaultValue={member.role} className="p-1.5 text-xs font-medium border rounded bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 outline-none text-zinc-700 dark:text-zinc-300">
                                                     <option value="GUEST">GUEST (미승인)</option>
                                                     <option value="MEMBER">MEMBER</option>
                                                     <option value="TEAM_MANAGER">TEAM_MANAGER</option>
                                                     <option value="ADMIN">ADMIN</option>
                                                     <option value="SUPER_ADMIN">SUPER_ADMIN</option>
                                                 </select>
+                                                <button type="submit" className="text-xs font-semibold text-indigo-600 border border-indigo-200 bg-indigo-50 px-2 py-1.5 rounded hover:bg-indigo-100 dark:border-indigo-800/50 dark:bg-indigo-900/20 dark:hover:bg-indigo-900/40 transition-colors">
+                                                    수정
+                                                </button>
                                             </form>
                                         ) : (
                                             <span className="inline-block px-2 py-1 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded text-xs font-semibold border border-zinc-200 dark:border-zinc-700">
@@ -131,15 +134,18 @@ export default async function MembersPage() {
                                     </td>
                                     <td className="px-6 py-4">
                                         {isAdmin && member.id !== myUser.id ? (
-                                            <form action={updateMemberAction}>
+                                            <form action={updateMemberAction} className="flex gap-2 items-center">
                                                 <input type="hidden" name="userId" value={member.id} />
                                                 <input type="hidden" name="role" value={member.role} />
-                                                <select name="teamId" defaultValue={member.team_id || ''} onChange={(e) => e.target.form?.requestSubmit()} className="p-1.5 text-xs font-medium border rounded bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 outline-none text-zinc-700 dark:text-zinc-300">
+                                                <select name="teamId" defaultValue={member.team_id || ''} className="p-1.5 text-xs font-medium border rounded bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 outline-none text-zinc-700 dark:text-zinc-300">
                                                     <option value="">미배정 (소속 없음)</option>
                                                     {teams?.map(t => (
                                                         <option key={t.id} value={t.id}>{t.name}</option>
                                                     ))}
                                                 </select>
+                                                <button type="submit" className="text-xs font-semibold text-indigo-600 border border-indigo-200 bg-indigo-50 px-2 py-1.5 rounded hover:bg-indigo-100 dark:border-indigo-800/50 dark:bg-indigo-900/20 dark:hover:bg-indigo-900/40 transition-colors">
+                                                    수정
+                                                </button>
                                             </form>
                                         ) : (
                                             <span className="text-zinc-600 dark:text-zinc-400">
