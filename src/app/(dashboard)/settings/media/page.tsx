@@ -2,6 +2,7 @@ import { createClient } from '@/utils/supabase/server';
 import { Network, Save } from 'lucide-react';
 import { savePlatformSettingsAction } from './actions';
 import TestMetaButton from './TestMetaButton';
+import TokenInput from './TokenInput';
 
 export default async function MediaSettingsPage() {
     const supabase = await createClient();
@@ -67,13 +68,7 @@ export default async function MediaSettingsPage() {
                             <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
                                 Access Token (2시간 만료 단기 토큰)
                             </label>
-                            <textarea
-                                name="accessToken"
-                                rows={4}
-                                defaultValue={metaSettings?.access_token || ''}
-                                className="w-full text-sm rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 p-2.5 outline-none focus:border-indigo-500 resize-none font-mono text-zinc-600 dark:text-zinc-400"
-                                placeholder="EAABw..."
-                            ></textarea>
+                            <TokenInput defaultValue={metaSettings?.access_token || ''} />
                             <p className="text-xs text-zinc-500 mt-1">실제 백엔드 검수 작업은 여기에 저장된 토큰을 우선적으로 사용하여 진행됩니다.</p>
                         </div>
 
