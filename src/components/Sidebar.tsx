@@ -69,6 +69,7 @@ export default function Sidebar() {
         { name: '실시간 검수 센터', href: '/audit', icon: Activity, roles: ['SUPER_ADMIN', 'ADMIN', 'TEAM_MANAGER', 'MEMBER'] },
         { name: '검수 히스토리', href: '/history', icon: History, roles: ['SUPER_ADMIN', 'ADMIN', 'TEAM_MANAGER', 'MEMBER'] },
         { name: '가입 승인 관리', href: '/settings/users', icon: UserCheck, roles: ['SUPER_ADMIN', 'ADMIN'] },
+        { name: '멤버 관리', href: '/settings/members', icon: Users, roles: ['SUPER_ADMIN', 'ADMIN', 'TEAM_MANAGER'] },
         { name: '매체 연동 관리', href: '/settings/media', icon: Cable, roles: ['SUPER_ADMIN', 'ADMIN'] },
         { name: '연결 계정 관리', href: '/settings/accounts', icon: Users, roles: ['SUPER_ADMIN', 'ADMIN'] },
     ];
