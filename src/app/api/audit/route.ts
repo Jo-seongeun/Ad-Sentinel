@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
-async function fetchMockLiveData(platform: string, ad_account_id: string) {
+async function fetchMockLiveData(platform: string, ad_account_id: string, token?: string) {
     // Returns mock live data with simulated discrepancies
     if (platform === 'META') {
+        if (!token) throw new Error('Meta API 연동 토큰이 설정되지 않았거나 만료되었습니다. [매체 연동 관리] 메뉴에서 갱신해주세요.');
         return [
             {
                 remote_campaign_id: 'meta_camp_1',
@@ -50,10 +51,18 @@ export async function POST(request: Request) {
             return NextResponse.json({ message: 'No active campaigns found.' });
         }
 
+        // Fetch dynamic platform tokens from database
+        const { data: metaSetting } = await supabase.from('platform_settings').select('access_token').eq('platform', 'META').single();
+        const metaToken = metaSetting?.access_token;
+
         const auditLogs = [];
 
         for (const plan of activeCampaigns) {
-            const liveDataRows = await fetchMockLiveData(plan.platform, plan.ad_account_id);
+            const liveDataRows = await fetchMockLiveData(
+                plan.platform,
+                plan.ad_account_id,
+                plan.platform === 'META' ? metaToken : undefined
+            );
 
             const liveData = liveDataRows.find(
                 (l) => l.campaign_name === plan.campaign_name &&
