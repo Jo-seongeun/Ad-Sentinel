@@ -21,6 +21,7 @@ export async function savePlatformSettingsAction(formData: FormData): Promise<vo
     const appId = formData.get('appId') as string;
     const appSecret = formData.get('appSecret') as string;
     const accessToken = formData.get('accessToken') as string;
+    const businessId = formData.get('businessId') as string;
 
     const { error } = await supabase
         .from('platform_settings')
@@ -29,6 +30,7 @@ export async function savePlatformSettingsAction(formData: FormData): Promise<vo
             app_id: appId,
             app_secret: appSecret,
             access_token: accessToken,
+            business_id: businessId || null,
             updated_at: new Date().toISOString()
         });
 

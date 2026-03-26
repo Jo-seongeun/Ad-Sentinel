@@ -62,6 +62,16 @@ export default async function MediaSettingsPage() {
                                     placeholder="••••••••••••••••"
                                 />
                             </div>
+                            <div className="md:col-span-2">
+                                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Business ID (BM ID) <span className="text-zinc-400 font-normal text-xs ml-2">(선택 시, 전체 광고 계정 목록 조회)</span></label>
+                                <input
+                                    type="text"
+                                    name="businessId"
+                                    defaultValue={metaSettings?.business_id || ''}
+                                    className="w-full text-sm rounded-lg bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 p-2.5 outline-none focus:border-indigo-500 font-mono"
+                                    placeholder="ex: 1045938501239"
+                                />
+                            </div>
                         </div>
 
                         <div>

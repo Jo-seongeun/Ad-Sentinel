@@ -13,47 +13,76 @@ export default async function AccountMappingPage() {
     const { data: mappingsData } = await supabase.from('team_account_map').select('*');
     const mappings = mappingsData || [];
 
-    // 3. Fetch Meta Access Token
-    const { data: metaSetting } = await supabase.from('platform_settings').select('access_token').eq('platform', 'META').single();
+    // 3. Fetch Meta Access Token and BM ID
+    const { data: metaSetting } = await supabase.from('platform_settings').select('access_token, business_id').eq('platform', 'META').single();
     const metaToken = metaSetting?.access_token;
+    const bmId = metaSetting?.business_id;
 
     let initialAccounts: AdAccount[] = [];
     let metaApiError = null;
 
-    // 4. Fetch ALL Meta Ad Accounts from Live API (Handling Cursor Pagination)
+    // 4. Fetch All Meta Ad Accounts (Me + BM Levels)
     if (metaToken) {
         try {
-            let nextUrl: string | null = `https://graph.facebook.com/v19.0/me/adaccounts?fields=name,account_id&limit=500&access_token=${metaToken}`;
-            let fetchedCount = 0;
+            const fetchAccounts = async (endpoint: string) => {
+                let nextUrl: string | null = endpoint;
+                let fetchedCount = 0;
+                let results: any[] = [];
 
-            while (nextUrl) {
-                const response = await fetch(nextUrl, { cache: 'no-store' });
-                const metaData: any = await response.json();
+                while (nextUrl) {
+                    const response = await fetch(nextUrl, { cache: 'no-store' });
+                    const metaData: any = await response.json();
 
-                if (metaData.error) {
-                    metaApiError = metaData.error.message;
-                    break;
+                    if (metaData.error) {
+                        metaApiError = metaData.error.message;
+                        break;
+                    }
+
+                    if (metaData.data && Array.isArray(metaData.data)) {
+                        fetchedCount += metaData.data.length;
+                        results.push(...metaData.data);
+                    }
+
+                    if (fetchedCount > 10000) break;
+                    nextUrl = metaData.paging?.next || null;
                 }
+                return results;
+            };
 
-                if (metaData.data && Array.isArray(metaData.data)) {
-                    fetchedCount += metaData.data.length;
-                    metaData.data.forEach((acc: any) => {
-                        const mappedInfo = mappings.find(m => m.ad_account_id === acc.id && m.platform === 'META');
-                        initialAccounts.push({
-                            id: acc.id,
-                            name: acc.name || `Meta Account (${acc.account_id})`,
-                            platform: 'META',
-                            assignedTeamId: mappedInfo ? mappedInfo.team_id : null
-                        });
-                    });
-                }
+            const endpointsToFetch = [
+                `https://graph.facebook.com/v19.0/me/adaccounts?fields=name,account_id&limit=500&access_token=${metaToken}`
+            ];
 
-                // Protect against infinite loops or excessive API calls (e.g. capping at 10,000 to prevent timeouts)
-                if (fetchedCount > 10000) break;
-
-                // Get the next page URL
-                nextUrl = metaData.paging?.next || null;
+            if (bmId) {
+                endpointsToFetch.push(`https://graph.facebook.com/v19.0/${bmId}/client_ad_accounts?fields=name,account_id&limit=500&access_token=${metaToken}`);
+                endpointsToFetch.push(`https://graph.facebook.com/v19.0/${bmId}/owned_ad_accounts?fields=name,account_id&limit=500&access_token=${metaToken}`);
             }
+
+            const allFetchedAccounts: any[] = [];
+            for (const ep of endpointsToFetch) {
+                const results = await fetchAccounts(ep);
+                allFetchedAccounts.push(...results);
+            }
+
+            // Deduplicate by ID
+            const uniqueAccountsMap = new Map();
+            for (const acc of allFetchedAccounts) {
+                if (!uniqueAccountsMap.has(acc.id)) {
+                    uniqueAccountsMap.set(acc.id, acc);
+                }
+            }
+
+            // Map to our UI format
+            uniqueAccountsMap.forEach((acc) => {
+                const mappedInfo = mappings.find(m => m.ad_account_id === acc.id && m.platform === 'META');
+                initialAccounts.push({
+                    id: acc.id,
+                    name: acc.name || `Meta Account (${acc.account_id})`,
+                    platform: 'META',
+                    assignedTeamId: mappedInfo ? mappedInfo.team_id : null
+                });
+            });
+
         } catch (e: any) {
             metaApiError = e.message;
         }
