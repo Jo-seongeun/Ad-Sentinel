@@ -59,8 +59,8 @@ export default function ActiveDashboardPage() {
                                     <Icon className="w-6 h-6" />
                                 </div>
                                 <span className={`flex items-center text-xs font-semibold px-2 py-1 rounded-full ${kpi.isPositive
-                                        ? 'text-emerald-700 bg-emerald-50 dark:bg-emerald-500/10 dark:text-emerald-400'
-                                        : 'text-rose-700 bg-rose-50 dark:bg-rose-500/10 dark:text-rose-400'
+                                    ? 'text-emerald-700 bg-emerald-50 dark:bg-emerald-500/10 dark:text-emerald-400'
+                                    : 'text-rose-700 bg-rose-50 dark:bg-rose-500/10 dark:text-rose-400'
                                     }`}>
                                     {kpi.isPositive ? <ArrowUpRight className="w-3 h-3 mr-1" /> : <ArrowDownRight className="w-3 h-3 mr-1" />}
                                     {kpi.change}
@@ -108,80 +108,80 @@ export default function ActiveDashboardPage() {
                             return (
                                 <div key={i} className="w-full flex justify-center group relative cursor-crosshair">
                                     <div className="absolute -top-10 scale-0 group-hover:scale-100 transition-transform bg-zinc-800 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap z-20 shadow-lg">
-                                        {i}:00 <br/>
+                                        {i}:00 <br />
                                         성과: {height2}
                                     </div>
-                                    <div 
-                                        className="w-1/2 bg-indigo-100 hover:bg-indigo-200 dark:bg-indigo-900/40 dark:hover:bg-indigo-800/60 rounded-t-sm transition-colors absolute bottom-0" 
-                                        style={{ height: \`\${height1}%\` }}
+                                    <div
+                                        className="w-1/2 bg-indigo-100 hover:bg-indigo-200 dark:bg-indigo-900/40 dark:hover:bg-indigo-800/60 rounded-t-sm transition-colors absolute bottom-0"
+                                        style={{ height: `${height1}%` }}
                                     ></div>
-                                    <div 
-                                        className="w-1/2 bg-indigo-500 hover:bg-indigo-400 dark:bg-indigo-500 dark:hover:bg-indigo-400 rounded-t-sm transition-colors absolute bottom-0 z-10" 
-                                        style={{ height: \`\${height2}%\` }}
+                                    <div
+                                        className="w-1/2 bg-indigo-500 hover:bg-indigo-400 dark:bg-indigo-500 dark:hover:bg-indigo-400 rounded-t-sm transition-colors absolute bottom-0 z-10"
+                                        style={{ height: `${height2}%` }}
                                     ></div>
-                </div>
-                );
+                                </div>
+                            );
                         })}
-            </div>
-            <div className="flex justify-between text-[10px] text-zinc-400 mt-2">
-                <span>00:00</span>
-                <span>06:00</span>
-                <span>12:00</span>
-                <span>18:00</span>
-                <span>24:00</span>
-            </div>
-        </div>
-
-                {/* 2. Live Alerts column */ }
-    <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm p-6 flex flex-col">
-        <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2 mb-6">
-            <Clock className="w-5 h-5 text-amber-500" /> 실시간 알림 센터
-        </h2>
-
-        <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
-            <div className="flex gap-3 relative before:absolute before:inset-y-0 before:left-1.5 before:border-l before:border-zinc-200 dark:before:border-zinc-800">
-                <div className="relative z-10 w-3 h-3 rounded-full bg-rose-500 mt-1 shrink-0 ring-4 ring-white dark:ring-zinc-900"></div>
-                <div>
-                    <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                        단가 상승 경고
-                        <span className="text-[10px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded font-bold">HIGH</span>
-                    </p>
-                    <p className="text-xs text-zinc-500 mt-0.5">CMP-1004 캠페인의 CPA가 목표치 대비 42% 초과 중입니다. 즉각적인 소재 점검이 필요합니다.</p>
-                    <span className="text-[10px] text-zinc-400 mt-1 block">15분 전</span>
+                    </div>
+                    <div className="flex justify-between text-[10px] text-zinc-400 mt-2">
+                        <span>00:00</span>
+                        <span>06:00</span>
+                        <span>12:00</span>
+                        <span>18:00</span>
+                        <span>24:00</span>
+                    </div>
                 </div>
-            </div>
 
-            <div className="flex gap-3 relative before:absolute before:inset-y-0 before:left-1.5 before:border-l before:border-zinc-200 dark:before:border-zinc-800">
-                <div className="relative z-10 w-3 h-3 rounded-full bg-amber-500 mt-1 shrink-0 ring-4 ring-white dark:ring-zinc-900"></div>
-                <div>
-                    <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">일일 예산 소진 임박</p>
-                    <p className="text-xs text-zinc-500 mt-0.5">글로벌 타겟팅 캠페인이 금일 설정된 예산의 90%를 소진했습니다.</p>
-                    <span className="text-[10px] text-zinc-400 mt-1 block">1시간 전</span>
-                </div>
-            </div>
+                {/* 2. Live Alerts column */}
+                <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm p-6 flex flex-col">
+                    <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2 mb-6">
+                        <Clock className="w-5 h-5 text-amber-500" /> 실시간 알림 센터
+                    </h2>
 
-            <div className="flex gap-3 relative">
-                <div className="relative z-10 w-3 h-3 rounded-full bg-emerald-500 mt-1 shrink-0 ring-4 ring-white dark:ring-zinc-900"></div>
-                <div>
-                    <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">ROAS 목표 조기 달성</p>
-                    <p className="text-xs text-zinc-500 mt-0.5">리타겟팅 캠페인 ROAS 500% 초과, 벤치마크를 상회중입니다.</p>
-                    <span className="text-[10px] text-zinc-400 mt-1 block">3시간 전</span>
+                    <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
+                        <div className="flex gap-3 relative before:absolute before:inset-y-0 before:left-1.5 before:border-l before:border-zinc-200 dark:before:border-zinc-800">
+                            <div className="relative z-10 w-3 h-3 rounded-full bg-rose-500 mt-1 shrink-0 ring-4 ring-white dark:ring-zinc-900"></div>
+                            <div>
+                                <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                                    단가 상승 경고
+                                    <span className="text-[10px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded font-bold">HIGH</span>
+                                </p>
+                                <p className="text-xs text-zinc-500 mt-0.5">CMP-1004 캠페인의 CPA가 목표치 대비 42% 초과 중입니다. 즉각적인 소재 점검이 필요합니다.</p>
+                                <span className="text-[10px] text-zinc-400 mt-1 block">15분 전</span>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3 relative before:absolute before:inset-y-0 before:left-1.5 before:border-l before:border-zinc-200 dark:before:border-zinc-800">
+                            <div className="relative z-10 w-3 h-3 rounded-full bg-amber-500 mt-1 shrink-0 ring-4 ring-white dark:ring-zinc-900"></div>
+                            <div>
+                                <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">일일 예산 소진 임박</p>
+                                <p className="text-xs text-zinc-500 mt-0.5">글로벌 타겟팅 캠페인이 금일 설정된 예산의 90%를 소진했습니다.</p>
+                                <span className="text-[10px] text-zinc-400 mt-1 block">1시간 전</span>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3 relative">
+                            <div className="relative z-10 w-3 h-3 rounded-full bg-emerald-500 mt-1 shrink-0 ring-4 ring-white dark:ring-zinc-900"></div>
+                            <div>
+                                <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">ROAS 목표 조기 달성</p>
+                                <p className="text-xs text-zinc-500 mt-0.5">리타겟팅 캠페인 ROAS 500% 초과, 벤치마크를 상회중입니다.</p>
+                                <span className="text-[10px] text-zinc-400 mt-1 block">3시간 전</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
-        </div>
-    </div>
 
             </div >
 
-        {/* Table Section */ }
-        < div className = "bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden" >
+            {/* Table Section */}
+            < div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden" >
                 <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/40">
                     <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                         실시간 모니터링 캠페인
                         <span className="bg-indigo-100 text-indigo-700 text-[10px] px-2 py-0.5 rounded-full uppercase font-bold tracking-wider">Live</span>
                     </h2>
                 </div>
-                
+
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left">
                         <thead className="text-xs text-zinc-500 dark:text-zinc-400 uppercase bg-zinc-50 dark:bg-zinc-900/60 font-semibold border-b border-zinc-200 dark:border-zinc-800">
@@ -202,9 +202,8 @@ export default function ActiveDashboardPage() {
                                         <div className="text-xs text-zinc-400 font-mono mt-0.5">{camp.id}</div>
                                     </td>
                                     <td className="px-6 py-4">
-                                        <span className={`text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider ${
-                                            camp.platform === 'Meta' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
-                                        }`}>{camp.platform}</span>
+                                        <span className={`text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider ${camp.platform === 'Meta' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
+                                            }`}>{camp.platform}</span>
                                     </td>
                                     <td className="px-6 py-4 font-medium text-zinc-700 dark:text-zinc-300">{camp.spend}</td>
                                     <td className="px-6 py-4">
