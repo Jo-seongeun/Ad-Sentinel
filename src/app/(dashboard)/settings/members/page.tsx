@@ -91,6 +91,7 @@ export default async function MembersPage() {
                         <thead className="bg-zinc-50 dark:bg-zinc-900/50 text-zinc-500 dark:text-zinc-400 sticky top-0 border-b border-zinc-200 dark:border-zinc-800 z-10">
                             <tr>
                                 <th className="px-6 py-4 font-medium">이메일</th>
+                                <th className="px-6 py-4 font-medium">사용자 명</th>
                                 <th className="px-6 py-4 font-medium">가입일시</th>
                                 <th className="px-6 py-4 font-medium">역할</th>
                                 <th className="px-6 py-4 font-medium">소속 팀</th>
@@ -102,11 +103,14 @@ export default async function MembersPage() {
                                 <tr key={member.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center text-xs font-semibold">
-                                                {member.email?.charAt(0).toUpperCase()}
+                                            <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-400 flex items-center justify-center text-xs font-semibold">
+                                                {member.full_name ? member.full_name.charAt(0) : member.email?.charAt(0).toUpperCase()}
                                             </div>
                                             <span className="font-medium text-zinc-900 dark:text-zinc-100">{member.email}</span>
                                         </div>
+                                    </td>
+                                    <td className="px-6 py-4 font-medium text-zinc-700 dark:text-zinc-300">
+                                        {member.full_name || <span className="text-zinc-400 italic text-xs font-normal">미입력</span>}
                                     </td>
                                     <td className="px-6 py-4 text-zinc-500">
                                         {new Date(member.created_at).toLocaleDateString()}

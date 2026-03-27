@@ -24,6 +24,18 @@ export default async function LoginPage(props: { searchParams: SearchParams }) {
                 )}
 
                 <div className="flex flex-col gap-1.5">
+                    <label htmlFor="fullName" className="text-sm font-medium text-zinc-700 dark:text-zinc-300">사용자 명</label>
+                    <input
+                        id="fullName"
+                        name="fullName"
+                        type="text"
+                        placeholder="홍길동_퍼포먼스1팀"
+                        required
+                        className="p-2.5 text-sm border rounded-lg bg-zinc-50 dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 outline-none focus:border-indigo-500 dark:focus:border-indigo-500 transition-colors"
+                    />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
                     <label htmlFor="email" className="text-sm font-medium text-zinc-700 dark:text-zinc-300">이메일</label>
                     <input
                         id="email"
