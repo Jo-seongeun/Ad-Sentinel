@@ -72,10 +72,16 @@ export async function updateMemberAction(formData: FormData): Promise<void> {
     const targetUserId = formData.get('userId') as string;
     const role = formData.get('role') as string;
     const teamId = formData.get('teamId') as string;
+    const fullName = formData.get('fullName') as string | null;
 
     const payload: any = { role };
     // Empty string means unassigned
     payload.team_id = teamId ? teamId : null;
+
+    // Only update full_name if it was provided in the form
+    if (fullName !== null) {
+        payload.full_name = fullName.trim() || null;
+    }
 
     const { error } = await supabaseAdmin.from('users').update(payload).eq('id', targetUserId);
     if (error) {

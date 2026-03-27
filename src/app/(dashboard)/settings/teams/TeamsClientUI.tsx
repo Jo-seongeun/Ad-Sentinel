@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from 'react';
 import { createTeamAction, updateTeamAction, deleteTeamAction } from './actions';
-import { Plus, Edit2, Trash2, Check, X, Users } from 'lucide-react';
+import { Plus, Edit2, Trash2, Check, X, Users, AlertTriangle } from 'lucide-react';
+import Link from 'next/link';
 
 export interface Team {
     id: string;
@@ -18,6 +19,8 @@ export default function TeamsClientUI({ initialTeams }: { initialTeams: Team[] }
 
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editName, setEditName] = useState('');
+
+    const [deleteTarget, setDeleteTarget] = useState<Team | null>(null);
 
     const handleCreate = () => {
         if (!newTeamName.trim()) return;
@@ -52,19 +55,24 @@ export default function TeamsClientUI({ initialTeams }: { initialTeams: Team[] }
         });
     };
 
-    const handleDelete = (id: string, name: string) => {
-        if (!confirm(`'${name}' 팀을 정말 삭제하시겠습니까? 연결된 계정 데이터에 영향을 줄 수 있습니다.`)) return;
+    const handleDeleteClick = (team: Team) => {
+        setDeleteTarget(team);
+    };
 
-        setTeams(teams.filter(t => t.id !== id));
+    const confirmDelete = () => {
+        if (!deleteTarget) return;
+
+        setTeams(teams.filter(t => t.id !== deleteTarget.id));
 
         startTransition(async () => {
             try {
-                await deleteTeamAction(id);
+                await deleteTeamAction(deleteTarget.id);
             } catch (e) {
                 alert('팀 삭제 중 오류가 발생했습니다.');
                 window.location.reload();
             }
         });
+        setDeleteTarget(null);
     };
 
     return (
@@ -133,7 +141,7 @@ export default function TeamsClientUI({ initialTeams }: { initialTeams: Team[] }
                                         <h4 className="font-semibold text-zinc-900 dark:text-zinc-100">{team.name}</h4>
                                         <p className="text-[11px] font-mono text-zinc-400 mt-1">ID: {team.id}</p>
                                     </div>
-                                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <div className="flex items-center gap-2">
                                         <button
                                             onClick={() => { setEditingId(team.id); setEditName(team.name); }}
                                             className="p-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 dark:bg-indigo-500/10 dark:text-indigo-400 dark:hover:bg-indigo-500/20 rounded-lg transition-colors"
@@ -141,7 +149,7 @@ export default function TeamsClientUI({ initialTeams }: { initialTeams: Team[] }
                                             <Edit2 className="w-4 h-4" />
                                         </button>
                                         <button
-                                            onClick={() => handleDelete(team.id, team.name)}
+                                            onClick={() => handleDeleteClick(team)}
                                             className="p-2 bg-rose-50 text-rose-600 hover:bg-rose-100 dark:bg-rose-500/10 dark:text-rose-400 dark:hover:bg-rose-500/20 rounded-lg transition-colors"
                                         >
                                             <Trash2 className="w-4 h-4" />
@@ -159,6 +167,35 @@ export default function TeamsClientUI({ initialTeams }: { initialTeams: Team[] }
                     )}
                 </div>
             </div>
+
+            {/* Custom Delete Modal Overlay */}
+            {deleteTarget && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 rounded-2xl shadow-xl max-w-sm w-full">
+                        <div className="flex items-center gap-3 text-rose-600 dark:text-rose-400 mb-2">
+                            <AlertTriangle className="w-6 h-6" />
+                            <h3 className="text-lg font-bold">팀 삭제 경고</h3>
+                        </div>
+                        <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 mt-4">
+                            '<span className="font-bold">{deleteTarget.name}</span>' 팀을 정말 삭제하시겠습니까?
+                        </p>
+                        <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-2 p-3 bg-rose-50 dark:bg-rose-900/10 rounded-lg">
+                            해당 팀 계정에 등록되어있는 팀 멤버들의 소속 팀 명을 다른 팀으로 수정해야 합니다. 삭제 시 주의가 필요합니다!
+                        </p>
+                        <div className="flex flex-col gap-2 mt-6">
+                            <button onClick={confirmDelete} className="w-full py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold rounded-lg transition-colors">
+                                네, 팀 삭제
+                            </button>
+                            <Link href="/settings/members" className="w-full py-2.5 bg-indigo-50 dark:bg-indigo-500/10 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 text-indigo-700 dark:text-indigo-400 text-center text-sm font-semibold rounded-lg transition-colors relative z-10 block">
+                                멤버 관리로 이동
+                            </Link>
+                            <button onClick={() => setDeleteTarget(null)} className="w-full py-2 text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">
+                                취소
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

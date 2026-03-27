@@ -110,7 +110,19 @@ export default async function MembersPage() {
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 font-medium text-zinc-700 dark:text-zinc-300">
-                                        {member.full_name || <span className="text-zinc-400 italic text-xs font-normal">미입력</span>}
+                                        {isAdmin && member.id !== myUser.id ? (
+                                            <form action={updateMemberAction} className="flex gap-2 items-center">
+                                                <input type="hidden" name="userId" value={member.id} />
+                                                <input type="hidden" name="role" value={member.role} />
+                                                <input type="hidden" name="teamId" value={member.team_id || ''} />
+                                                <input type="text" name="fullName" defaultValue={member.full_name || ''} placeholder="이름 입력" className="p-1.5 text-xs font-medium border rounded bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 outline-none w-24 text-zinc-700 dark:text-zinc-300" />
+                                                <button type="submit" className="text-xs font-semibold text-indigo-600 border border-indigo-200 bg-indigo-50 px-2 py-1.5 rounded hover:bg-indigo-100 dark:border-indigo-800/50 dark:bg-indigo-900/20 dark:hover:bg-indigo-900/40 transition-colors">
+                                                    수정
+                                                </button>
+                                            </form>
+                                        ) : (
+                                            member.full_name || <span className="text-zinc-400 italic text-xs font-normal">미입력</span>
+                                        )}
                                     </td>
                                     <td className="px-6 py-4 text-zinc-500">
                                         {new Date(member.created_at).toLocaleDateString()}
@@ -120,6 +132,7 @@ export default async function MembersPage() {
                                             <form action={updateMemberAction} className="flex gap-2 items-center">
                                                 <input type="hidden" name="userId" value={member.id} />
                                                 <input type="hidden" name="teamId" value={member.team_id || ''} />
+                                                <input type="hidden" name="fullName" value={member.full_name || ''} />
                                                 <select name="role" defaultValue={member.role} className="p-1.5 text-xs font-medium border rounded bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 outline-none text-zinc-700 dark:text-zinc-300">
                                                     <option value="GUEST">GUEST (미승인)</option>
                                                     <option value="MEMBER">MEMBER</option>
@@ -142,6 +155,7 @@ export default async function MembersPage() {
                                             <form action={updateMemberAction} className="flex gap-2 items-center">
                                                 <input type="hidden" name="userId" value={member.id} />
                                                 <input type="hidden" name="role" value={member.role} />
+                                                <input type="hidden" name="fullName" value={member.full_name || ''} />
                                                 <select name="teamId" defaultValue={member.team_id || ''} className="p-1.5 text-xs font-medium border rounded bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 outline-none text-zinc-700 dark:text-zinc-300">
                                                     <option value="">미배정 (소속 없음)</option>
                                                     {teams?.map(t => (
