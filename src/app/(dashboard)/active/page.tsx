@@ -102,9 +102,16 @@ export default function ActiveDashboardPage() {
                         </div>
 
                         {/* Bars representing hours */}
-                        {Array.from({ length: 24 }).map((_, i) => {
-                            const height1 = Math.floor(Math.random() * 80) + 20; // Imp
-                            const height2 = Math.floor(Math.random() * (height1 - 10)) + 10; // Clicks/Conv
+                        {[
+                            { h1: 30, h2: 15 }, { h1: 25, h2: 10 }, { h1: 20, h2: 8 }, { h1: 15, h2: 5 },
+                            { h1: 22, h2: 12 }, { h1: 35, h2: 18 }, { h1: 45, h2: 25 }, { h1: 60, h2: 35 },
+                            { h1: 75, h2: 45 }, { h1: 85, h2: 55 }, { h1: 90, h2: 60 }, { h1: 95, h2: 65 },
+                            { h1: 88, h2: 58 }, { h1: 92, h2: 62 }, { h1: 85, h2: 55 }, { h1: 80, h2: 50 },
+                            { h1: 70, h2: 40 }, { h1: 65, h2: 35 }, { h1: 75, h2: 45 }, { h1: 85, h2: 50 },
+                            { h1: 90, h2: 60 }, { h1: 80, h2: 55 }, { h1: 60, h2: 40 }, { h1: 40, h2: 25 }
+                        ].map((data, i) => {
+                            const height1 = data.h1;
+                            const height2 = data.h2;
                             return (
                                 <div key={i} className="w-full flex justify-center group relative cursor-crosshair">
                                     <div className="absolute -top-10 scale-0 group-hover:scale-100 transition-transform bg-zinc-800 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap z-20 shadow-lg">
