@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react';
 import * as xlsx from 'xlsx';
-import { UploadCloud, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { UploadCloud, CheckCircle2, AlertCircle, Loader2, Download, ShieldCheck } from 'lucide-react';
 import { crosscheckApiAction } from './actions';
 
 export interface ParsedRow {
@@ -37,6 +37,23 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
     const [isAuditing, setIsAuditing] = useState(false);
     const [results, setResults] = useState<AuditResult[] | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const downloadTemplate = (e: React.MouseEvent) => {
+        e.stopPropagation(); // 드래그 앤 드롭 클릭 이벤트 방지
+        const headers = [
+            '매체', '팀명', '광고 계정 ID', '캠페인명', '캠페인 목적', '예산 유형',
+            '광고 세트/그룹명', '집행 예산', '시작일', '종료일', '최적화 목표',
+            '랜딩 페이지 URL', 'UTM 소스/매체', 'UTM 캠페인', '전환 픽셀 ID/이벤트'
+        ];
+
+        const mockData1 = ['Meta', '퍼포먼스 1팀', '1234567890', '24년_봄_프로모션', 'OUTCOME_SALES', '일일 예산', '세트_A_타겟', '50000', '2024-04-01', '2024-04-30', 'Purchase', 'https://example.com/spring', 'facebook / sa', 'spring_sale', '123456789'];
+        const mockData2 = ['Google', '퍼포먼스 1팀', '123-456-7890', '브랜드_검색', 'TRAFFIC', '일일 예산', '그룹_브랜드', '100000', '2024-04-01', '9999-12-31', 'Click', 'https://example.com', 'google / cpc', 'brand_kw', 'AW-12345'];
+
+        const wb = xlsx.utils.book_new();
+        const ws = xlsx.utils.aoa_to_sheet([headers, mockData1, mockData2]);
+        xlsx.utils.book_append_sheet(wb, ws, '표준 미디어믹스');
+        xlsx.writeFile(wb, 'Ad-Sentinel_표준_미디어믹스_템플릿.xlsx');
+    };
 
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -105,19 +122,28 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
         <div className="flex-1 overflow-hidden flex flex-col gap-4">
             {rows.length === 0 ? (
                 <div
-                    className="flex-1 border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-xl bg-zinc-50 dark:bg-zinc-900/50 flex items-center justify-center flex-col gap-4 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-900"
+                    className="flex-1 border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-xl bg-zinc-50 dark:bg-zinc-900/50 flex items-center justify-center flex-col gap-6 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-900"
                     onClick={() => fileInputRef.current?.click()}
                     style={{ cursor: 'pointer' }}
                 >
-                    <div className="p-4 bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 rounded-full">
-                        <UploadCloud className="w-10 h-10" />
-                    </div>
-                    <div className="text-center">
-                        <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">미디어믹스 엑셀 파일 업로드</h3>
-                        <p className="text-sm text-zinc-500 mt-2 max-w-sm mx-auto">
+                    <div className="text-center flex flex-col items-center gap-3">
+                        <div className="p-4 bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 rounded-full">
+                            <UploadCloud className="w-10 h-10" />
+                        </div>
+                        <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mt-2">미디어믹스 엑셀 파일 업로드</h3>
+                        <p className="text-sm text-zinc-500 max-w-sm mx-auto">
                             드래그 앤 드롭 하거나 영역을 클릭하여 엑셀(.xlsx) 파일을 업로드해주세요. 양식은 15개의 표준 컬럼을 준수해야 합니다.
                         </p>
                     </div>
+
+                    <button
+                        onClick={downloadTemplate}
+                        className="mt-2 text-sm font-semibold flex items-center gap-2 px-4 py-2 border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-700 transition"
+                    >
+                        <Download className="w-4 h-4" />
+                        기본 엑셀 양식 템플릿 다운로드
+                    </button>
+
                     <input
                         type="file"
                         accept=".xlsx, .xls"
