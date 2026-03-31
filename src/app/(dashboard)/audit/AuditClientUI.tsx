@@ -69,8 +69,28 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
         ];
 
         const wb = xlsx.utils.book_new();
-        const ws = xlsx.utils.aoa_to_sheet([headers, mockData1, mockData2]);
-        xlsx.utils.book_append_sheet(wb, ws, '표준 미디어믹스');
+
+        // 1. Data Sheet
+        const wsData = xlsx.utils.aoa_to_sheet([headers, mockData1, mockData2]);
+        xlsx.utils.book_append_sheet(wb, wsData, '미디어믹스_기본양식');
+
+        // 2. Reference Sheet (Meta API Data Dictionary)
+        const referenceHeaders = ['항목명', '입력 가능한 값 (Meta API 기준) / 설명'];
+        const referenceData = [
+            ['캠페인 목적 (Objective)', 'OUTCOME_SALES (판매), OUTCOME_LEADS (리드), OUTCOME_TRAFFIC (트래픽), OUTCOME_ENGAGEMENT (참여), OUTCOME_AWARENESS (인지도), OUTCOME_APP_PROMOTION (앱 홍보)'],
+            ['구매 유형 (Buying Type)', 'AUCTION (경매), RESERVE (도달 및 빈도)'],
+            ['타겟팅 요약', '자유 양식 (예: KR, 25-44세, 여성) - API의 복잡한 타겟팅 JSON과 직관적으로 비교하기 위한 메모 용도'],
+            ['최적화 목표 (Optimization)', 'CONVERSIONS (전환), LINK_CLICKS (링크 클릭), IMPRESSIONS (노출), REACH (도달), LANDING_PAGE_VIEWS (랜딩 페이지 조회), THRUPLAY (동영상 조회)'],
+            ['과금 기준 (Billing Event)', 'IMPRESSIONS (노출), LINK_CLICKS (링크 클릭), THRUPLAY (동영상 조회)'],
+            ['픽셀/이벤트 (Event)', 'Purchase (구매), Lead (리드), AddToCart (장바구니 담기), ViewContent (콘텐츠 조회) 등 표준 이벤트명 및 맞춤 이벤트명']
+        ];
+        const wsRef = xlsx.utils.aoa_to_sheet([referenceHeaders, ...referenceData]);
+
+        // Adjust column widths for better readability in the reference sheet
+        wsRef['!cols'] = [{ wch: 25 }, { wch: 120 }];
+
+        xlsx.utils.book_append_sheet(wb, wsRef, '입력 가이드(옵션값)');
+
         xlsx.writeFile(wb, 'Ad-Sentinel_표준_미디어믹스_템플릿.xlsx');
     };
 
