@@ -49,7 +49,7 @@ export default async function ActiveDashboardPage() {
     const { data: metaSetting } = await supabase
         .from('platform_settings')
         .select('access_token')
-        .eq('id', 'META')
+        .eq('platform', 'META')
         .single();
     const token = metaSetting?.access_token;
 
