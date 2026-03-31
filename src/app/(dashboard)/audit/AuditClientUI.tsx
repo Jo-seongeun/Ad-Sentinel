@@ -242,12 +242,18 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
                                     <th className="px-4 py-3 font-medium text-center">No</th>
                                     <th className="px-4 py-3 font-medium">검수 결과</th>
                                     <th className="px-4 py-3 font-medium">매체</th>
-                                    <th className="px-4 py-3 font-medium">팀명</th>
                                     <th className="px-4 py-3 font-medium">캠페인 명</th>
-                                    <th className="px-4 py-3 font-medium">세트/그룹 명</th>
-                                    <th className="px-4 py-3 font-medium">계정 ID</th>
-                                    <th className="px-4 py-3 font-medium text-right">세트 예산</th>
+                                    <th className="px-4 py-3 font-medium">캠페인 목적</th>
+                                    <th className="px-4 py-3 font-medium">캠페인 예산</th>
+                                    <th className="px-4 py-3 font-medium">구매 유형</th>
+                                    <th className="px-4 py-3 font-medium bg-zinc-200/50 dark:bg-zinc-700/50">세트/그룹 명</th>
+                                    <th className="px-4 py-3 font-medium bg-zinc-200/50 dark:bg-zinc-700/50 text-right">세트 예산</th>
+                                    <th className="px-4 py-3 font-medium bg-zinc-200/50 dark:bg-zinc-700/50">시작일</th>
+                                    <th className="px-4 py-3 font-medium bg-zinc-200/50 dark:bg-zinc-700/50">종료일</th>
+                                    <th className="px-4 py-3 font-medium bg-zinc-200/50 dark:bg-zinc-700/50">타겟팅 요약</th>
+                                    <th className="px-4 py-3 font-medium bg-zinc-200/50 dark:bg-zinc-700/50">최적화 목표</th>
                                     <th className="px-4 py-3 font-medium">랜딩 URL</th>
+                                    <th className="px-4 py-3 font-medium">UTM 파라미터</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
@@ -277,20 +283,28 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
                                                     {row.Platform || '미상'}
                                                 </span>
                                             </td>
-                                            <td className="px-4 py-3 font-medium text-zinc-600 dark:text-zinc-400">
-                                                {row.Team}
-                                                {teamName && row.Team !== teamName && <AlertCircle className="w-3 h-3 text-rose-500 inline ml-1" title="소속 팀과 불일치" />}
-                                            </td>
-                                            <td className="px-4 py-3 font-semibold text-zinc-900 dark:text-zinc-200 max-w-[200px] truncate" title={row.CampaignName}>{row.CampaignName}</td>
-                                            <td className="px-4 py-3 text-zinc-700 dark:text-zinc-300 max-w-[200px] truncate" title={row.AdSetName}>{row.AdSetName}</td>
-                                            <td className="px-4 py-3 text-zinc-500 font-mono">{row.AccountID}</td>
-                                            <td className="px-4 py-3 text-right font-medium text-emerald-600 dark:text-emerald-400">
+                                            <td className="px-4 py-3 font-semibold text-zinc-900 dark:text-zinc-200 max-w-[150px] truncate" title={row.CampaignName}>{row.CampaignName}</td>
+                                            <td className="px-4 py-3 text-zinc-500 max-w-[100px] truncate">{row.Objective}</td>
+                                            <td className="px-4 py-3 text-right font-medium text-zinc-600 dark:text-zinc-400">
                                                 <span className="text-[10px] text-zinc-400 mr-1">{row.Currency}</span>
+                                                {row.CampaignBudget ? Number(row.CampaignBudget).toLocaleString() : '-'}
+                                            </td>
+                                            <td className="px-4 py-3 text-zinc-500 font-mono text-[10px]">{row.BuyingType}</td>
+
+                                            <td className="px-4 py-3 text-indigo-700 dark:text-indigo-300 font-medium max-w-[150px] truncate bg-zinc-50/50 dark:bg-zinc-800/30" title={row.AdSetName}>{row.AdSetName}</td>
+                                            <td className="px-4 py-3 text-right font-bold text-emerald-600 dark:text-emerald-400 bg-zinc-50/50 dark:bg-zinc-800/30">
+                                                <span className="text-[10px] text-emerald-600/50 dark:text-emerald-400/50 mr-1">{row.Currency}</span>
                                                 {row.AdSetBudget.toLocaleString()}
                                             </td>
-                                            <td className="px-4 py-3 text-zinc-500 max-w-[200px] truncate" title={row.FinalURL}>
+                                            <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400 text-[10px] bg-zinc-50/50 dark:bg-zinc-800/30">{row.StartDate}</td>
+                                            <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400 text-[10px] bg-zinc-50/50 dark:bg-zinc-800/30">{row.EndDate}</td>
+                                            <td className="px-4 py-3 text-zinc-500 max-w-[150px] truncate text-[10px] bg-zinc-50/50 dark:bg-zinc-800/30" title={row.Targeting}>{row.Targeting}</td>
+                                            <td className="px-4 py-3 text-zinc-500 max-w-[100px] truncate text-[10px] bg-zinc-50/50 dark:bg-zinc-800/30">{row.Optimization}</td>
+
+                                            <td className="px-4 py-3 text-zinc-500 max-w-[150px] truncate" title={row.FinalURL}>
                                                 <a href={row.FinalURL} target="_blank" rel="noreferrer" className="hover:text-indigo-500 underline">{row.FinalURL}</a>
                                             </td>
+                                            <td className="px-4 py-3 text-zinc-500 font-mono text-[10px] max-w-[150px] truncate" title={row.UTMParameters}>{row.UTMParameters}</td>
                                         </tr>
                                     );
                                 })}
