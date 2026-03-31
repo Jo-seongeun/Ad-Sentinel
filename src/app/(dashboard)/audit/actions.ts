@@ -95,10 +95,13 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                     errors.push('매체에 일치하는 광고 세트가 없음');
                     status = 'FAIL';
                 } else {
-                    // Budget Check
-                    const liveBudget = Number(liveAdSet.daily_budget) || Number(liveAdSet.lifetime_budget) || 0;
-                    if (liveBudget > 0 && Math.abs(liveBudget - row.AdSetBudget) > (row.AdSetBudget * 0.1)) {
-                        errors.push(`예산 불일치 (기획안: ${row.AdSetBudget.toLocaleString()}, 매체: ${liveBudget.toLocaleString()})`);
+                    // Budget Check (Normalize cents for USD, EUR, GBP based on Excel Currency column)
+                    const isCentCurrency = ['USD', 'EUR', 'GBP'].includes((row.Currency || 'KRW').toUpperCase());
+                    const liveBudgetRaw = Number(liveAdSet.daily_budget) || Number(liveAdSet.lifetime_budget) || 0;
+                    const liveBudgetNormalized = isCentCurrency ? liveBudgetRaw / 100 : liveBudgetRaw;
+
+                    if (liveBudgetNormalized > 0 && Math.abs(liveBudgetNormalized - row.AdSetBudget) > (row.AdSetBudget * 0.1)) {
+                        errors.push(`예산 불일치 (기획안: ${row.AdSetBudget.toLocaleString()}, 매체: ${liveBudgetNormalized.toLocaleString()})`);
                         status = 'FAIL';
                     }
 

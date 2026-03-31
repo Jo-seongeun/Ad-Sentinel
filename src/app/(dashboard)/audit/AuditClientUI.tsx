@@ -12,6 +12,7 @@ export interface ParsedRow {
     // Campaign
     CampaignName: string;
     Objective: string;
+    Currency: string;
     CampaignBudget: string;
     BuyingType: string;
     // AdSet
@@ -50,20 +51,20 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
         e.stopPropagation(); // 드래그 앤 드롭 클릭 이벤트 방지
         const headers = [
             '매체', '팀명', '계정 ID',
-            '캠페인명', '캠페인 목적', '캠페인 예산', '구매 유형',
+            '캠페인명', '캠페인 목적', '통화', '캠페인 예산', '구매 유형',
             '광고 세트명', '세트 예산 유형', '세트 예산', '시작일', '종료일', '타겟팅 요약', '최적화 목표', '과금 기준', '픽셀/이벤트',
             '광고명', '랜딩 URL', 'UTM 파라미터', 'CTA 버튼'
         ];
 
         const mockData1 = [
             'Meta', teamName || '소속 팀명 입력', '1234567890',
-            '24년_봄_프로모션', 'OUTCOME_SALES', '', 'AUCTION',
+            '24년_봄_프로모션', 'OUTCOME_SALES', 'KRW', '', 'AUCTION',
             '세트_A_타겟', '일일 예산', '50000', '2024-04-01', '2024-04-30', 'KR, 25-44', 'CONVERSIONS', 'IMPRESSIONS', 'Purchase',
             '이미지_소재_1', 'https://example.com/spring', 'utm_source=fb&utm_medium=cpa', 'SHOP_NOW'
         ];
         const mockData2 = [
             'Google', teamName || '소속 팀명 입력', '123-456-7890',
-            '브랜드_검색', 'TRAFFIC', '1000000', '',
+            '브랜드_검색', 'TRAFFIC', 'USD', '1000000', '',
             '그룹_브랜드', '일일 예산', '10000', '2024-04-01', '9999-12-31', 'KR, All', 'CLICKS', 'CPC', 'Click',
             '효율업_소재', 'https://example.com', 'utm_source=google&utm_medium=cpc', 'LEARN_MORE'
         ];
@@ -77,6 +78,7 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
         // 2. Reference Sheet (Meta API Data Dictionary)
         const referenceHeaders = ['항목명', '입력 가능한 값 (Meta API 기준) / 설명'];
         const referenceData = [
+            ['통화 (Currency)', 'KRW, USD, JPY 등 ISO 4217 표준 통화 코드 (대문자 입력 권장)'],
             ['캠페인 목적 (Objective)', 'OUTCOME_SALES (판매), OUTCOME_LEADS (리드), OUTCOME_TRAFFIC (트래픽), OUTCOME_ENGAGEMENT (참여), OUTCOME_AWARENESS (인지도), OUTCOME_APP_PROMOTION (앱 홍보)'],
             ['구매 유형 (Buying Type)', 'AUCTION (경매), RESERVE (도달 및 빈도)'],
             ['타겟팅 요약', '자유 양식 (예: KR, 25-44세, 여성) - API의 복잡한 타겟팅 JSON과 직관적으로 비교하기 위한 메모 용도'],
@@ -116,6 +118,7 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
                     AccountID: item['계정 ID']?.toString() || item['광고 계정 ID']?.toString() || '',
                     CampaignName: item['캠페인명'] || '',
                     Objective: item['캠페인 목적'] || '',
+                    Currency: item['통화'] || 'KRW',
                     CampaignBudget: item['캠페인 예산']?.toString() || '',
                     BuyingType: item['구매 유형'] || '',
                     AdSetName: item['광고 세트명'] || item['광고 세트/그룹명'] || '',
@@ -282,6 +285,7 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
                                             <td className="px-4 py-3 text-zinc-700 dark:text-zinc-300 max-w-[200px] truncate" title={row.AdSetName}>{row.AdSetName}</td>
                                             <td className="px-4 py-3 text-zinc-500 font-mono">{row.AccountID}</td>
                                             <td className="px-4 py-3 text-right font-medium text-emerald-600 dark:text-emerald-400">
+                                                <span className="text-[10px] text-zinc-400 mr-1">{row.Currency}</span>
                                                 {row.AdSetBudget.toLocaleString()}
                                             </td>
                                             <td className="px-4 py-3 text-zinc-500 max-w-[200px] truncate" title={row.FinalURL}>
