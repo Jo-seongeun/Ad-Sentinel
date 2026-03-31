@@ -8,27 +8,38 @@ export default async function ActiveDashboardPage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return <div>Auth required</div>;
 
-    const { data: myUser } = await supabase.from('users').select('team_id').eq('id', user.id).single();
+    const { data: myUser } = await supabase.from('users').select('team_id, role').eq('id', user.id).single();
     const teamId = myUser?.team_id;
+    const role = myUser?.role;
+    const isAdmin = role === 'SUPER_ADMIN' || role === 'ADMIN';
 
-    if (!teamId) {
+    if (!teamId && !isAdmin) {
         return <div className="p-8 text-center text-zinc-500">소속된 팀이 없습니다. 관리자에게 문의하세요.</div>;
     }
 
     // 2. Fetch Recent Audits for the team (Top 5)
-    const { data: recentAudits } = await supabase
+    let auditQuery = supabase
         .from('audit_logs')
         .select('id, created_at, total_campaigns, error_count')
-        .eq('team_id', teamId)
         .order('created_at', { ascending: false })
         .limit(5);
 
+    if (!isAdmin) {
+        auditQuery = auditQuery.eq('team_id', teamId);
+    }
+    const { data: recentAudits } = await auditQuery;
+
     // 3. Fetch Team's Meta Accounts
-    const { data: mappings, error: mappingError } = await supabase
+    let mappingQuery = supabase
         .from('team_account_map')
         .select('ad_account_id, platform')
-        .eq('team_id', teamId)
         .ilike('platform', '%meta%');
+
+    if (!isAdmin) {
+        mappingQuery = mappingQuery.eq('team_id', teamId);
+    }
+
+    const { data: mappings, error: mappingError } = await mappingQuery;
 
     if (mappingError) console.error('Team Mapping Error:', mappingError);
 
