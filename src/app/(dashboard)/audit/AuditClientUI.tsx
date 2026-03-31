@@ -9,18 +9,26 @@ export interface ParsedRow {
     Platform: string;
     Team: string;
     AccountID: string;
+    // Campaign
     CampaignName: string;
     Objective: string;
-    BudgetType: string;
+    CampaignBudget: string;
+    BuyingType: string;
+    // AdSet
     AdSetName: string;
-    PlannedBudget: number;
+    AdSetBudgetType: string;
+    AdSetBudget: number;
     StartDate: string;
     EndDate: string;
+    Targeting: string;
     Optimization: string;
-    FinalURL: string;
-    SourceMedium: string;
-    UTMCampaign: string;
+    BillingEvent: string;
     PixelEvent: string;
+    // Ad
+    AdName: string;
+    FinalURL: string;
+    UTMParameters: string;
+    CTA: string;
 }
 
 export interface AuditResult {
@@ -41,13 +49,24 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
     const downloadTemplate = (e: React.MouseEvent) => {
         e.stopPropagation(); // 드래그 앤 드롭 클릭 이벤트 방지
         const headers = [
-            '매체', '팀명', '광고 계정 ID', '캠페인명', '캠페인 목적', '예산 유형',
-            '광고 세트/그룹명', '집행 예산', '시작일', '종료일', '최적화 목표',
-            '랜딩 페이지 URL', 'UTM 소스/매체', 'UTM 캠페인', '전환 픽셀 ID/이벤트'
+            '매체', '팀명', '계정 ID',
+            '캠페인명', '캠페인 목적', '캠페인 예산', '구매 유형',
+            '광고 세트명', '세트 예산 유형', '세트 예산', '시작일', '종료일', '타겟팅 요약', '최적화 목표', '과금 기준', '픽셀/이벤트',
+            '광고명', '랜딩 URL', 'UTM 파라미터', 'CTA 버튼'
         ];
 
-        const mockData1 = ['Meta', '퍼포먼스 1팀', '1234567890', '24년_봄_프로모션', 'OUTCOME_SALES', '일일 예산', '세트_A_타겟', '50000', '2024-04-01', '2024-04-30', 'Purchase', 'https://example.com/spring', 'facebook / sa', 'spring_sale', '123456789'];
-        const mockData2 = ['Google', '퍼포먼스 1팀', '123-456-7890', '브랜드_검색', 'TRAFFIC', '일일 예산', '그룹_브랜드', '100000', '2024-04-01', '9999-12-31', 'Click', 'https://example.com', 'google / cpc', 'brand_kw', 'AW-12345'];
+        const mockData1 = [
+            'Meta', teamName || '소속 팀명 입력', '1234567890',
+            '24년_봄_프로모션', 'OUTCOME_SALES', '', 'AUCTION',
+            '세트_A_타겟', '일일 예산', '50000', '2024-04-01', '2024-04-30', 'KR, 25-44', 'CONVERSIONS', 'IMPRESSIONS', 'Purchase',
+            '이미지_소재_1', 'https://example.com/spring', 'utm_source=fb&utm_medium=cpa', 'SHOP_NOW'
+        ];
+        const mockData2 = [
+            'Google', teamName || '소속 팀명 입력', '123-456-7890',
+            '브랜드_검색', 'TRAFFIC', '1000000', '',
+            '그룹_브랜드', '일일 예산', '10000', '2024-04-01', '9999-12-31', 'KR, All', 'CLICKS', 'CPC', 'Click',
+            '효율업_소재', 'https://example.com', 'utm_source=google&utm_medium=cpc', 'LEARN_MORE'
+        ];
 
         const wb = xlsx.utils.book_new();
         const ws = xlsx.utils.aoa_to_sheet([headers, mockData1, mockData2]);
@@ -68,26 +87,30 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
                 const wsname = wb.SheetNames[0];
                 const ws = wb.Sheets[wsname];
 
-                // Assuming Excel has headers in the first row matching the Korean names:
-                // 매체 | 팀명 | 광고 계정 ID | 캠페인명 | 캠페인 목적 | 예산 유형 | 광고 세트/그룹명 | 집행 예산 | 시작일 | 종료일 | 최적화 목표 | 랜딩 페이지 URL | UTM 소스/매체 | UTM 캠페인 | 전환 픽셀 ID/이벤트
+                // Mapping 20 columns
                 const data: any[] = xlsx.utils.sheet_to_json(ws);
 
                 const mappedData: ParsedRow[] = data.map(item => ({
                     Platform: item['매체'] || '',
                     Team: item['팀명'] || '',
-                    AccountID: item['광고 계정 ID']?.toString() || '',
+                    AccountID: item['계정 ID']?.toString() || item['광고 계정 ID']?.toString() || '',
                     CampaignName: item['캠페인명'] || '',
                     Objective: item['캠페인 목적'] || '',
-                    BudgetType: item['예산 유형'] || '',
-                    AdSetName: item['광고 세트/그룹명'] || '',
-                    PlannedBudget: Number(item['집행 예산']) || 0,
+                    CampaignBudget: item['캠페인 예산']?.toString() || '',
+                    BuyingType: item['구매 유형'] || '',
+                    AdSetName: item['광고 세트명'] || item['광고 세트/그룹명'] || '',
+                    AdSetBudgetType: item['세트 예산 유형'] || item['예산 유형'] || '',
+                    AdSetBudget: Number(item['세트 예산']) || Number(item['집행 예산']) || 0,
                     StartDate: item['시작일'] || '',
                     EndDate: item['종료일'] || '',
+                    Targeting: item['타겟팅 요약'] || '',
                     Optimization: item['최적화 목표'] || '',
-                    FinalURL: item['랜딩 페이지 URL'] || '',
-                    SourceMedium: item['UTM 소스/매체'] || '',
-                    UTMCampaign: item['UTM 캠페인'] || '',
-                    PixelEvent: item['전환 픽셀 ID/이벤트'] || ''
+                    BillingEvent: item['과금 기준'] || '',
+                    PixelEvent: item['픽셀/이벤트'] || item['전환 픽셀 ID/이벤트'] || '',
+                    AdName: item['광고명'] || '',
+                    FinalURL: item['랜딩 URL'] || item['랜딩 페이지 URL'] || '',
+                    UTMParameters: item['UTM 파라미터'] || item['UTM 캠페인'] || '',
+                    CTA: item['CTA 버튼'] || ''
                 }));
 
                 setRows(mappedData);
@@ -196,10 +219,11 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
                                     <th className="px-4 py-3 font-medium text-center">No</th>
                                     <th className="px-4 py-3 font-medium">검수 결과</th>
                                     <th className="px-4 py-3 font-medium">매체</th>
+                                    <th className="px-4 py-3 font-medium">팀명</th>
                                     <th className="px-4 py-3 font-medium">캠페인 명</th>
                                     <th className="px-4 py-3 font-medium">세트/그룹 명</th>
                                     <th className="px-4 py-3 font-medium">계정 ID</th>
-                                    <th className="px-4 py-3 font-medium text-right">집행 예산</th>
+                                    <th className="px-4 py-3 font-medium text-right">세트 예산</th>
                                     <th className="px-4 py-3 font-medium">랜딩 URL</th>
                                 </tr>
                             </thead>
@@ -230,11 +254,15 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
                                                     {row.Platform || '미상'}
                                                 </span>
                                             </td>
+                                            <td className="px-4 py-3 font-medium text-zinc-600 dark:text-zinc-400">
+                                                {row.Team}
+                                                {teamName && row.Team !== teamName && <AlertCircle className="w-3 h-3 text-rose-500 inline ml-1" title="소속 팀과 불일치" />}
+                                            </td>
                                             <td className="px-4 py-3 font-semibold text-zinc-900 dark:text-zinc-200 max-w-[200px] truncate" title={row.CampaignName}>{row.CampaignName}</td>
                                             <td className="px-4 py-3 text-zinc-700 dark:text-zinc-300 max-w-[200px] truncate" title={row.AdSetName}>{row.AdSetName}</td>
                                             <td className="px-4 py-3 text-zinc-500 font-mono">{row.AccountID}</td>
                                             <td className="px-4 py-3 text-right font-medium text-emerald-600 dark:text-emerald-400">
-                                                {row.PlannedBudget.toLocaleString()}
+                                                {row.AdSetBudget.toLocaleString()}
                                             </td>
                                             <td className="px-4 py-3 text-zinc-500 max-w-[200px] truncate" title={row.FinalURL}>
                                                 <a href={row.FinalURL} target="_blank" rel="noreferrer" className="hover:text-indigo-500 underline">{row.FinalURL}</a>
