@@ -24,13 +24,15 @@ export default async function ActiveDashboardPage() {
         .limit(5);
 
     // 3. Fetch Team's Meta Accounts
-    const { data: mappings } = await supabase
+    const { data: mappings, error: mappingError } = await supabase
         .from('team_account_map')
-        .select('account_id, platform')
+        .select('ad_account_id, platform')
         .eq('team_id', teamId)
         .ilike('platform', '%meta%');
 
-    const accountIds = mappings?.map(m => m.account_id) || [];
+    if (mappingError) console.error('Team Mapping Error:', mappingError);
+
+    const accountIds = mappings?.map(m => m.ad_account_id) || [];
 
     // 4. Fetch Meta Token
     const { data: metaSetting } = await supabase
