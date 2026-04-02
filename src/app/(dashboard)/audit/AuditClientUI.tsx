@@ -109,8 +109,14 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
                 const wsname = wb.SheetNames[0];
                 const ws = wb.Sheets[wsname];
 
-                // Mapping 20 columns
-                const data: any[] = xlsx.utils.sheet_to_json(ws);
+                // Mapping 20 columns with formatted strings for Dates
+                const data: any[] = xlsx.utils.sheet_to_json(ws, { raw: false, dateNF: 'yyyy-mm-dd' });
+
+                // For safety, remove any whitespace from number strings before parsing
+                const parseBudget = (val: any) => {
+                    const cleanVal = String(val || '').replace(/,/g, '').trim();
+                    return Number(cleanVal) || 0;
+                };
 
                 const mappedData: ParsedRow[] = data.map(item => ({
                     Platform: item['매체'] || '',
@@ -123,7 +129,7 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
                     BuyingType: item['구매 유형'] || '',
                     AdSetName: item['광고 세트명'] || item['광고 세트/그룹명'] || '',
                     AdSetBudgetType: item['세트 예산 유형'] || item['예산 유형'] || '',
-                    AdSetBudget: Number(item['세트 예산']) || Number(item['집행 예산']) || 0,
+                    AdSetBudget: parseBudget(item['세트 예산']) || parseBudget(item['집행 예산']) || 0,
                     StartDate: item['시작일'] || '',
                     EndDate: item['종료일'] || '',
                     Targeting: item['타겟팅 요약'] || '',

@@ -138,15 +138,21 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
     }
 
     // Insert Audit History to DB
-    if (myUser?.team_id) {
+    if (myUser?.team_id && results.length > 0) {
         // Find how many errors
         const errorCount = results.filter(r => r.status === 'FAIL').length;
-        await supabase.from('audit_logs').insert({
+        const detailsData = results.filter(r => r.status !== 'PASS');
+
+        const { error: insertError } = await supabase.from('audit_logs').insert({
             team_id: myUser.team_id,
             total_campaigns: rows.length,
             error_count: errorCount,
-            details: JSON.stringify(results.filter(r => r.status !== 'PASS'))
+            details: detailsData
         });
+
+        if (insertError) {
+            console.error('Audit Log Insert Error:', insertError);
+        }
     }
 
     return results;
