@@ -45,6 +45,7 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
     const [isParsing, setIsParsing] = useState(false);
     const [isAuditing, setIsAuditing] = useState(false);
     const [results, setResults] = useState<AuditResult[] | null>(null);
+    const [isDragOver, setIsDragOver] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const downloadTemplate = (e: React.MouseEvent) => {
@@ -96,10 +97,7 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
         xlsx.writeFile(wb, 'Ad-Sentinel_표준_미디어믹스_템플릿.xlsx');
     };
 
-    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
+    const processFile = (file: File) => {
         setIsParsing(true);
         const reader = new FileReader();
         reader.onload = (evt) => {
@@ -155,6 +153,28 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
         reader.readAsArrayBuffer(file);
     };
 
+    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) processFile(file);
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragOver(true);
+    };
+
+    const handleDragLeave = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragOver(false);
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragOver(false);
+        const file = e.dataTransfer.files?.[0];
+        if (file) processFile(file);
+    };
+
     const handleAudit = async () => {
         if (rows.length === 0) return;
         setIsAuditing(true);
@@ -174,8 +194,11 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
         <div className="flex-1 overflow-hidden flex flex-col gap-4">
             {rows.length === 0 ? (
                 <div
-                    className="flex-1 border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-xl bg-zinc-50 dark:bg-zinc-900/50 flex items-center justify-center flex-col gap-6 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-900"
+                    className={`flex-1 border-2 border-dashed rounded-xl flex items-center justify-center flex-col gap-6 transition-all ${isDragOver ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 shadow-inner' : 'border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900/50 hover:bg-zinc-100 dark:hover:bg-zinc-900'}`}
                     onClick={() => fileInputRef.current?.click()}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
                     style={{ cursor: 'pointer' }}
                 >
                     <div className="text-center flex flex-col items-center gap-3">

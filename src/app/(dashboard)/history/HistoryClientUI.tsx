@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { format } from 'date-fns';
 import { AlertCircle, ChevronDown, ChevronRight, CheckCircle2 } from 'lucide-react';
 import { AuditResult } from '../audit/AuditClientUI';
-import { passAuditErrorAction } from './actions';
+import { passAuditErrorAction, passAllAuditErrorsAction } from './actions';
 
 export default function HistoryClientUI({ logs, isAdmin }: { logs: any[], isAdmin: boolean }) {
     const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
@@ -24,6 +24,21 @@ export default function HistoryClientUI({ logs, isAdmin }: { logs: any[], isAdmi
         } catch (err) {
             console.error(err);
             alert('오류 확인 처리에 실패했습니다.');
+        } finally {
+            setIsPassing(null);
+        }
+    };
+
+    const handlePassAll = async (e: React.MouseEvent, logId: string) => {
+        e.stopPropagation();
+        if (!confirm('이 검수 내역의 모든 미해결 오류를 정상(Pass)으로 일괄 처리하시겠습니까?')) return;
+
+        setIsPassing(`all-${logId}`);
+        try {
+            await passAllAuditErrorsAction(logId);
+        } catch (err) {
+            console.error(err);
+            alert('일괄 확인 처리에 실패했습니다.');
         } finally {
             setIsPassing(null);
         }
@@ -104,7 +119,18 @@ export default function HistoryClientUI({ logs, isAdmin }: { logs: any[], isAdmi
                                     <tr>
                                         <td colSpan={isAdmin ? 6 : 5} className="p-0 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30">
                                             <div className="p-6">
-                                                <h4 className="font-semibold text-sm mb-4 text-zinc-900 dark:text-zinc-100">검수 상세 결과 리포트</h4>
+                                                <div className="flex justify-between items-center mb-4">
+                                                    <h4 className="font-semibold text-sm text-zinc-900 dark:text-zinc-100">검수 상세 결과 리포트</h4>
+                                                    {!isPerfect && (
+                                                        <button
+                                                            onClick={(e) => handlePassAll(e, log.id)}
+                                                            disabled={isPassing === `all-${log.id}`}
+                                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-200 rounded-md text-xs font-semibold shadow-sm transition-all disabled:opacity-50"
+                                                        >
+                                                            {isPassing === `all-${log.id}` ? '처리 중...' : <><CheckCircle2 className="w-3.5 h-3.5" />오류 내역 All Pass</>}
+                                                        </button>
+                                                    )}
+                                                </div>
                                                 {details.length === 0 ? (
                                                     <div className="p-4 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-sm text-zinc-500 text-center">
                                                         모든 캠페인이 완벽하게 연동 및 검증되었습니다! 🎉
