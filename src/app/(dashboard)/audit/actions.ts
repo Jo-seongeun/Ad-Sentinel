@@ -70,29 +70,7 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
             await new Promise(resolve => setTimeout(resolve, 50));
         }
 
-        // 1. URL 404 Check
-        if (status !== 'FAIL' && row.FinalURL) {
-            try {
-                // Basic ping
-                const ping = await fetch(row.FinalURL, { method: 'HEAD', cache: 'no-cache' });
-                if (!ping.ok) {
-                    if (ping.status === 403 || ping.status === 429 || ping.status === 401) {
-                        errors.push(`URL 접근 보안 차단 (상태: ${ping.status}, 봇 차단 의심)`);
-                        if (status === 'PASS') status = 'WARNING';
-                    } else if (ping.status >= 500) {
-                        errors.push(`URL 서버 오류 (상태: ${ping.status})`);
-                        status = 'FAIL';
-                    } else {
-                        errors.push(`URL 연결 실패 (상태: ${ping.status})`);
-                        status = 'FAIL';
-                    }
-                }
-            } catch (e) {
-                // Fetch failed (network error or CORS block, we treat as warning)
-                errors.push('URL 접근 불안정 (네트워크 차단 등)');
-                if (status === 'PASS') status = 'WARNING';
-            }
-        }
+        // (Deprecated) URL 404 Check was removed as the goal is to cross-check with Meta's actual Live URL, not to ping the server.
 
         if (status !== 'FAIL' && token && row.Platform.toUpperCase() === 'META') {
             const cache = liveMetaCache[row.AccountID];
@@ -115,12 +93,61 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
 
                     // Optimization & Billing
                     if (row.Optimization && liveAdSet.optimization_goal !== row.Optimization) {
-                        errors.push(`최적화 목표 불일치 (매체: ${liveAdSet.optimization_goal})`);
+                        errors.push(`최적화 목표 불일치 (기획안: ${row.Optimization}, 매체: ${liveAdSet.optimization_goal})`);
                         status = 'FAIL';
                     }
                     if (row.BillingEvent && liveAdSet.billing_event !== row.BillingEvent) {
-                        errors.push(`과금 기준 불일치 (매체: ${liveAdSet.billing_event})`);
+                        errors.push(`과금 기준 불일치 (기획안: ${row.BillingEvent}, 매체: ${liveAdSet.billing_event})`);
                         status = 'FAIL';
+                    }
+
+                    // Check Ad Level (URL and UTM)
+                    if (row.AdName) {
+                        const liveAd = cache.ads.find((a: any) => a.name === row.AdName && a.adset_id === liveAdSet.id);
+                        if (!liveAd) {
+                            errors.push(`매체에 일치하는 광고가 없음 (${row.AdName})`);
+                            status = 'FAIL';
+                        } else {
+                            // Link extraction from Meta Ad
+                            const creative = liveAd.creative || {};
+                            const spec = creative.object_story_spec || {};
+                            const metaLink = spec.link_data?.link || spec.video_data?.call_to_action?.value?.link || "";
+
+                            // Normalize URLs for comparison (stripping query params and trailing slashes)
+                            const normalizeUrl = (url: string) => {
+                                if (!url) return "";
+                                try {
+                                    const u = new URL(url);
+                                    return (u.origin + u.pathname).replace(/\/$/, '').toLowerCase();
+                                } catch {
+                                    return url.split('?')[0].replace(/\/$/, '').toLowerCase();
+                                }
+                            };
+
+                            if (row.FinalURL) {
+                                const normMeta = normalizeUrl(metaLink);
+                                const normExcel = normalizeUrl(row.FinalURL);
+                                if (normMeta && normExcel && normMeta !== normExcel) {
+                                    errors.push(`랜딩 URL 불일치 (매체: ${metaLink})`);
+                                    status = 'FAIL';
+                                } else if (!metaLink) {
+                                    errors.push(`매체에 랜딩 URL이 세팅되지 않음`);
+                                    status = 'WARNING';
+                                }
+                            }
+
+                            // UTM Parameter Check
+                            const metaUtm = creative.url_tags || "";
+                            if (row.UTMParameters) {
+                                if (!metaUtm) {
+                                    errors.push(`매체에 UTM 파라미터가 비어있음`);
+                                    status = 'FAIL';
+                                } else if (!metaUtm.includes(row.UTMParameters) && metaUtm !== row.UTMParameters) {
+                                    errors.push(`UTM 파라미터 불일치 (매체: ${metaUtm})`);
+                                    status = 'FAIL';
+                                }
+                            }
+                        }
                     }
                 }
             }
