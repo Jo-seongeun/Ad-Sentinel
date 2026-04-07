@@ -76,12 +76,20 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                 // Basic ping
                 const ping = await fetch(row.FinalURL, { method: 'HEAD', cache: 'no-cache' });
                 if (!ping.ok) {
-                    errors.push(`URL 상태 오류 (${ping.status})`);
-                    status = 'FAIL';
+                    if (ping.status === 403 || ping.status === 429 || ping.status === 401) {
+                        errors.push(`URL 접근 보안 차단 (상태: ${ping.status}, 봇 차단 의심)`);
+                        if (status === 'PASS') status = 'WARNING';
+                    } else if (ping.status >= 500) {
+                        errors.push(`URL 서버 오류 (상태: ${ping.status})`);
+                        status = 'FAIL';
+                    } else {
+                        errors.push(`URL 연결 실패 (상태: ${ping.status})`);
+                        status = 'FAIL';
+                    }
                 }
             } catch (e) {
                 // Fetch failed (network error or CORS block, we treat as warning)
-                errors.push('URL 접근 불안정(서버 봇 차단 가능성)');
+                errors.push('URL 접근 불안정 (네트워크 차단 등)');
                 if (status === 'PASS') status = 'WARNING';
             }
         }
