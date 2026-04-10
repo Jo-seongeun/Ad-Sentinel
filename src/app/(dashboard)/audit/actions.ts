@@ -35,8 +35,8 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
     if (token) {
         for (const act of accountIds) {
             try {
-                // Fetch AdSets
-                const adsetRes = await fetch(`https://graph.facebook.com/v19.0/act_${act}/adsets?fields=name,daily_budget,lifetime_budget,status,campaign_id,optimization_goal,billing_event,promoted_object&limit=500&access_token=${token}`);
+                // Fetch AdSets along with their Campaign's budget
+                const adsetRes = await fetch(`https://graph.facebook.com/v19.0/act_${act}/adsets?fields=name,daily_budget,lifetime_budget,status,campaign_id,campaign{name,daily_budget,lifetime_budget},optimization_goal,billing_event,promoted_object&limit=500&access_token=${token}`);
                 const adsetData = await adsetRes.json();
 
                 // Fetch Ads for URL & UTM checking
@@ -81,13 +81,42 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                     errors.push('매체에 일치하는 광고 세트가 없음');
                     status = 'FAIL';
                 } else {
-                    // Budget Check (Normalize cents for USD, EUR, GBP based on Excel Currency column)
+                    // Budget Check (Support both Campaign Budget (CBO) and AdSet Budget (ABO))
                     const isCentCurrency = ['USD', 'EUR', 'GBP'].includes((row.Currency || 'KRW').toUpperCase());
-                    const liveBudgetRaw = Number(liveAdSet.daily_budget) || Number(liveAdSet.lifetime_budget) || 0;
-                    const liveBudgetNormalized = isCentCurrency ? liveBudgetRaw / 100 : liveBudgetRaw;
 
-                    if (liveBudgetNormalized > 0 && Math.abs(liveBudgetNormalized - row.AdSetBudget) > (row.AdSetBudget * 0.1)) {
-                        errors.push(`예산 불일치 (기획안: ${row.AdSetBudget.toLocaleString()}, 매체: ${liveBudgetNormalized.toLocaleString()})`);
+                    const excelCampBudget = Number(String(row.CampaignBudget || '').replace(/,/g, '').trim()) || 0;
+                    const excelAdSetBudget = row.AdSetBudget || 0;
+
+                    const liveCampDaily = Number(liveAdSet.campaign?.daily_budget) || 0;
+                    const liveCampLifetime = Number(liveAdSet.campaign?.lifetime_budget) || 0;
+                    const liveCampRaw = liveCampDaily || liveCampLifetime || 0;
+                    const liveCampNormalized = isCentCurrency ? liveCampRaw / 100 : liveCampRaw;
+
+                    const liveAdSetDaily = Number(liveAdSet.daily_budget) || 0;
+                    const liveAdSetLifetime = Number(liveAdSet.lifetime_budget) || 0;
+                    const liveAdSetRaw = liveAdSetDaily || liveAdSetLifetime || 0;
+                    const liveAdSetNormalized = isCentCurrency ? liveAdSetRaw / 100 : liveAdSetRaw;
+
+                    if (excelCampBudget > 0) {
+                        // Compare Campaign Budget (CBO)
+                        if (liveCampNormalized > 0 && Math.abs(liveCampNormalized - excelCampBudget) > (excelCampBudget * 0.1)) {
+                            errors.push(`캠페인 예산 불일치 (기획안: ${excelCampBudget.toLocaleString()}, 매체: ${liveCampNormalized.toLocaleString()})`);
+                            status = 'FAIL';
+                        } else if (liveCampNormalized === 0) {
+                            errors.push(`매체의 캠페인 예산이 0입니다 (세트 예산 활용 가능성)`);
+                            status = 'FAIL';
+                        }
+                    } else if (excelAdSetBudget > 0) {
+                        // Compare AdSet Budget (ABO)
+                        if (liveAdSetNormalized > 0 && Math.abs(liveAdSetNormalized - excelAdSetBudget) > (excelAdSetBudget * 0.1)) {
+                            errors.push(`세트 예산 불일치 (기획안: ${excelAdSetBudget.toLocaleString()}, 매체: ${liveAdSetNormalized.toLocaleString()})`);
+                            status = 'FAIL';
+                        } else if (liveAdSetNormalized === 0) {
+                            errors.push(`매체의 세트 예산이 0입니다 (캠페인 예산 활용 가능성)`);
+                            status = 'FAIL';
+                        }
+                    } else {
+                        errors.push(`기획안 엑셀에 설정된 예산 값이 없습니다.`);
                         status = 'FAIL';
                     }
 
@@ -153,10 +182,20 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
             }
         } else if (status !== 'FAIL' && !token && row.Platform.toUpperCase() === 'META') {
             // Mock Meta logic
-            if (row.AdSetBudget < 1000) {
+            const excelCampBudget = Number(String(row.CampaignBudget || '').replace(/,/g, '').trim()) || 0;
+            const excelAdSetBudget = row.AdSetBudget || 0;
+
+            if (excelCampBudget > 0 && excelCampBudget < 1000) {
+                errors.push('캠페인 예산이 비정상적으로 낮습니다.');
+                status = 'FAIL';
+            } else if (excelCampBudget === 0 && excelAdSetBudget > 0 && excelAdSetBudget < 1000) {
                 errors.push('세트 예산이 비정상적으로 낮습니다.');
                 status = 'FAIL';
+            } else if (excelCampBudget === 0 && excelAdSetBudget === 0) {
+                errors.push('예산 입력값이 없습니다.');
+                if (status === 'PASS') status = 'WARNING';
             }
+
             if (!row.UTMParameters) {
                 errors.push('UTM 파라미터가 누락되었습니다.');
                 if (status === 'PASS') status = 'WARNING';
