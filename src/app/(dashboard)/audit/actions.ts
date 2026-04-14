@@ -84,8 +84,8 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                     // Budget Check (Support both Campaign Budget (CBO) and AdSet Budget (ABO))
                     const isCentCurrency = ['USD', 'EUR', 'GBP'].includes((row.Currency || 'KRW').toUpperCase());
 
-                    const excelCampBudget = Number(String(row.CampaignBudget || '').replace(/,/g, '').trim()) || 0;
-                    const excelAdSetBudget = row.AdSetBudget || 0;
+                    const excelCampBudget = Number(row.CampaignBudget) || 0;
+                    const excelAdSetBudget = Number(row.AdSetBudget) || 0;
 
                     const liveCampDaily = Number(liveAdSet.campaign?.daily_budget) || 0;
                     const liveCampLifetime = Number(liveAdSet.campaign?.lifetime_budget) || 0;
@@ -182,8 +182,8 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
             }
         } else if (status !== 'FAIL' && !token && row.Platform.toUpperCase() === 'META') {
             // Mock Meta logic
-            const excelCampBudget = Number(String(row.CampaignBudget || '').replace(/,/g, '').trim()) || 0;
-            const excelAdSetBudget = row.AdSetBudget || 0;
+            const excelCampBudget = Number(row.CampaignBudget) || 0;
+            const excelAdSetBudget = Number(row.AdSetBudget) || 0;
 
             if (excelCampBudget > 0 && excelCampBudget < 1000) {
                 errors.push('캠페인 예산이 비정상적으로 낮습니다.');

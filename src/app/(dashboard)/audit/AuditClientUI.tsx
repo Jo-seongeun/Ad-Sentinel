@@ -13,7 +13,7 @@ export interface ParsedRow {
     CampaignName: string;
     Objective: string;
     Currency: string;
-    CampaignBudget: string;
+    CampaignBudget: number;
     BuyingType: string;
     // AdSet
     AdSetName: string;
@@ -112,7 +112,17 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
 
                 // For safety, remove any whitespace from number strings before parsing
                 const parseBudget = (val: any) => {
-                    const cleanVal = String(val || '').replace(/,/g, '').trim();
+                    if (!val) return 0;
+                    let str = String(val).replace(/,/g, '').trim();
+
+                    // Handle "만" keyword (e.g., "120만" -> 1200000)
+                    if (str.includes('만')) {
+                        const numPart = Number(str.replace(/만/g, '').replace(/원/g, '').replace(/[^0-9.]/g, ''));
+                        return numPart * 10000;
+                    }
+
+                    // Remove all non-numeric characters except dot
+                    const cleanVal = str.replace(/[^0-9.]/g, '');
                     return Number(cleanVal) || 0;
                 };
 
@@ -123,7 +133,7 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
                     CampaignName: item['캠페인명'] || '',
                     Objective: item['캠페인 목적'] || '',
                     Currency: item['통화'] || 'KRW',
-                    CampaignBudget: item['캠페인 예산']?.toString() || '',
+                    CampaignBudget: parseBudget(item['캠페인 예산']),
                     BuyingType: item['구매 유형'] || '',
                     AdSetName: item['광고 세트명'] || item['광고 세트/그룹명'] || '',
                     AdSetBudgetType: item['세트 예산 유형'] || item['예산 유형'] || '',
@@ -316,7 +326,7 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
                                             <td className="px-4 py-3 text-zinc-500 max-w-[100px] truncate">{row.Objective}</td>
                                             <td className="px-4 py-3 text-right font-medium text-zinc-600 dark:text-zinc-400">
                                                 <span className="text-[10px] text-zinc-400 mr-1">{row.Currency}</span>
-                                                {row.CampaignBudget ? Number(row.CampaignBudget).toLocaleString() : '-'}
+                                                {row.CampaignBudget > 0 ? row.CampaignBudget.toLocaleString() : '-'}
                                             </td>
                                             <td className="px-4 py-3 text-zinc-500 font-mono text-[10px]">{row.BuyingType}</td>
 
