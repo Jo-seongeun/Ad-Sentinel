@@ -84,8 +84,8 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                     // Budget Check (Support both Campaign Budget (CBO) and AdSet Budget (ABO))
                     const isCentCurrency = ['USD', 'EUR', 'GBP'].includes((row.Currency || 'KRW').toUpperCase());
 
-                    const excelCampBudget = Number(row.CampaignBudget) || 0;
-                    const excelAdSetBudget = Number(row.AdSetBudget) || 0;
+                    const excelCampBudget = Number(String(row.CampaignBudget || '').replace(/,/g, '').replace(/[^0-9.]/g, '').trim()) || 0;
+                    const excelAdSetBudget = Number(String(row.AdSetBudget || '').replace(/,/g, '').replace(/[^0-9.]/g, '').trim()) || 0;
 
                     const liveCampDaily = Number(liveAdSet.campaign?.daily_budget) || 0;
                     const liveCampLifetime = Number(liveAdSet.campaign?.lifetime_budget) || 0;
@@ -96,6 +96,12 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                     const liveAdSetLifetime = Number(liveAdSet.lifetime_budget) || 0;
                     const liveAdSetRaw = liveAdSetDaily || liveAdSetLifetime || 0;
                     const liveAdSetNormalized = isCentCurrency ? liveAdSetRaw / 100 : liveAdSetRaw;
+
+                    console.log('--- Budget Check Debug ---');
+                    console.log('Row AdSetName:', row.AdSetName);
+                    console.log('Excel Camp Budget:', excelCampBudget);
+                    console.log('Live Camp Budget:', liveCampNormalized);
+                    console.log('Live Camp Fields:', liveAdSet.campaign);
 
                     if (excelCampBudget > 0) {
                         // Compare Campaign Budget (CBO)
@@ -182,8 +188,8 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
             }
         } else if (status !== 'FAIL' && !token && row.Platform.toUpperCase() === 'META') {
             // Mock Meta logic
-            const excelCampBudget = Number(row.CampaignBudget) || 0;
-            const excelAdSetBudget = Number(row.AdSetBudget) || 0;
+            const excelCampBudget = Number(String(row.CampaignBudget || '').replace(/,/g, '').replace(/[^0-9.]/g, '').trim()) || 0;
+            const excelAdSetBudget = Number(String(row.AdSetBudget || '').replace(/,/g, '').replace(/[^0-9.]/g, '').trim()) || 0;
 
             if (excelCampBudget > 0 && excelCampBudget < 1000) {
                 errors.push('캠페인 예산이 비정상적으로 낮습니다.');
