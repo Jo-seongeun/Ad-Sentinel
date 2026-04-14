@@ -9,27 +9,23 @@ export interface ParsedRow {
     Platform: string;
     Team: string;
     AccountID: string;
-    // Campaign
     CampaignName: string;
-    Objective: string;
-    Currency: string;
-    CampaignBudget: number;
-    BuyingType: string;
-    // AdSet
-    AdSetName: string;
-    AdSetBudgetType: string;
-    AdSetBudget: number;
+    CampaignDailyBudget: number;
+    CampaignLifetimeBudget: number;
     StartDate: string;
     EndDate: string;
-    Targeting: string;
-    Optimization: string;
-    BillingEvent: string;
-    PixelEvent: string;
-    // Ad
+    AdSetName: string;
+    AdSetDailyBudget: number;
+    AdSetLifetimeBudget: number;
+    CampaignObjective: string;
+    CampaignBuyingType: string;
     AdName: string;
-    FinalURL: string;
+    LandingURL: string;
     UTMParameters: string;
-    CTA: string;
+    AdSetOptimizationGoal: string;
+    AdSetBillingEvent: string;
+    PixelID: string;
+    CustomEventType: string;
 }
 
 export interface AuditResult {
@@ -52,22 +48,25 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
         e.stopPropagation(); // 드래그 앤 드롭 클릭 이벤트 방지
         const headers = [
             '매체', '팀명', '계정 ID',
-            '캠페인명', '캠페인 목적', '통화', '캠페인 예산', '구매 유형',
-            '광고 세트명', '세트 예산 유형', '세트 예산', '시작일', '종료일', '타겟팅 요약', '최적화 목표', '과금 기준', '픽셀/이벤트',
-            '광고명', '랜딩 URL', 'UTM 파라미터', 'CTA 버튼'
+            '캠페인명', '캠페인 일 예산', '캠페인 예산', '시작일', '종료일',
+            '광고 세트명', '광고 세트 일 예산', '광고 세트 예산',
+            '캠페인 목적', '구매 유형', '광고명', '랜딩 URL', 'UTM 파라미터',
+            '최적화 목표', '과금 기준', '픽셀/이벤트', '이벤트 유형'
         ];
 
         const mockData1 = [
-            'Meta', teamName || '소속 팀명 입력', '1234567890',
-            '24년_봄_프로모션', 'OUTCOME_SALES', 'KRW', '', 'AUCTION',
-            '세트_A_타겟', '일일 예산', '50000', '2024-04-01', '2024-04-30', 'KR, 25-44', 'CONVERSIONS', 'IMPRESSIONS', 'Purchase',
-            '이미지_소재_1', 'https://example.com/spring', 'utm_source=fb&utm_medium=cpa', 'SHOP_NOW'
+            'Meta', teamName || '소속 팀명 입력', '1777607596977990',
+            '24년_봄_프로모션_캠페인', '500000', '10000000', '2024-04-01', '2024-04-30',
+            '세트_A_타겟', '', '2000000',
+            'OUTCOME_SALES', 'AUCTION', '이미지_소재_1', 'https://example.com/spring', 'utm_source=fb&utm_medium=cpa',
+            'CONVERSIONS', 'IMPRESSIONS', '123456789', 'Purchase'
         ];
         const mockData2 = [
-            'Google', teamName || '소속 팀명 입력', '123-456-7890',
-            '브랜드_검색', 'TRAFFIC', 'USD', '1000000', '',
-            '그룹_브랜드', '일일 예산', '10000', '2024-04-01', '9999-12-31', 'KR, All', 'CLICKS', 'CPC', 'Click',
-            '효율업_소재', 'https://example.com', 'utm_source=google&utm_medium=cpc', 'LEARN_MORE'
+            'Meta', teamName || '소속 팀명 입력', '1777607596977990',
+            '24년_가을_프로모션_캠페인', '', '20000000', '2024-09-01', '2024-09-30',
+            '세트_B_타겟', '50000', '',
+            'OUTCOME_TRAFFIC', 'AUCTION', '참여유도_소재_A', 'https://example.com/fall', 'utm_source=fb&utm_medium=cpc',
+            'LINK_CLICKS', 'IMPRESSIONS', '', ''
         ];
 
         const wb = xlsx.utils.book_new();
@@ -129,25 +128,24 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
                 const mappedData: ParsedRow[] = data.map(item => ({
                     Platform: item['매체'] || '',
                     Team: item['팀명'] || '',
-                    AccountID: item['계정 ID']?.toString() || item['광고 계정 ID']?.toString() || '',
+                    AccountID: item['계정 ID']?.toString() || '',
                     CampaignName: item['캠페인명'] || '',
-                    Objective: item['캠페인 목적'] || '',
-                    Currency: item['통화'] || 'KRW',
-                    CampaignBudget: parseBudget(item['캠페인 예산']),
-                    BuyingType: item['구매 유형'] || '',
-                    AdSetName: item['광고 세트명'] || item['광고 세트/그룹명'] || '',
-                    AdSetBudgetType: item['세트 예산 유형'] || item['예산 유형'] || '',
-                    AdSetBudget: parseBudget(item['세트 예산']) || parseBudget(item['집행 예산']) || 0,
+                    CampaignDailyBudget: parseBudget(item['캠페인 일 예산']),
+                    CampaignLifetimeBudget: parseBudget(item['캠페인 예산']),
                     StartDate: item['시작일'] || '',
                     EndDate: item['종료일'] || '',
-                    Targeting: item['타겟팅 요약'] || '',
-                    Optimization: item['최적화 목표'] || '',
-                    BillingEvent: item['과금 기준'] || '',
-                    PixelEvent: item['픽셀/이벤트'] || item['전환 픽셀 ID/이벤트'] || '',
+                    AdSetName: item['광고 세트명'] || '',
+                    AdSetDailyBudget: parseBudget(item['광고 세트 일 예산']),
+                    AdSetLifetimeBudget: parseBudget(item['광고 세트 예산']),
+                    CampaignObjective: item['캠페인 목적'] || '',
+                    CampaignBuyingType: item['구매 유형'] || '',
                     AdName: item['광고명'] || '',
-                    FinalURL: item['랜딩 URL'] || item['랜딩 페이지 URL'] || '',
-                    UTMParameters: item['UTM 파라미터'] || item['UTM 캠페인'] || '',
-                    CTA: item['CTA 버튼'] || ''
+                    LandingURL: item['랜딩 URL'] || '',
+                    UTMParameters: item['UTM 파라미터'] || '',
+                    AdSetOptimizationGoal: item['최적화 목표'] || '',
+                    AdSetBillingEvent: item['과금 기준'] || '',
+                    PixelID: item['픽셀/이벤트']?.toString() || '',
+                    CustomEventType: item['이벤트 유형'] || ''
                 }));
 
                 setRows(mappedData);
@@ -278,21 +276,28 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
                         <table className="w-full text-left text-xs whitespace-nowrap">
                             <thead className="bg-zinc-100 dark:bg-zinc-800/80 text-zinc-600 dark:text-zinc-400 sticky top-0 border-b border-zinc-200 dark:border-zinc-800 z-10 shadow-sm">
                                 <tr>
-                                    <th className="px-4 py-3 font-medium text-center">No</th>
-                                    <th className="px-4 py-3 font-medium">검수 결과</th>
-                                    <th className="px-4 py-3 font-medium">매체</th>
-                                    <th className="px-4 py-3 font-medium">캠페인 명</th>
-                                    <th className="px-4 py-3 font-medium">캠페인 목적</th>
-                                    <th className="px-4 py-3 font-medium">캠페인 예산</th>
-                                    <th className="px-4 py-3 font-medium">구매 유형</th>
-                                    <th className="px-4 py-3 font-medium bg-zinc-200/50 dark:bg-zinc-700/50">세트/그룹 명</th>
-                                    <th className="px-4 py-3 font-medium bg-zinc-200/50 dark:bg-zinc-700/50 text-right">세트 예산</th>
+                                    <th className="px-4 py-3 font-medium text-center bg-zinc-100 dark:bg-zinc-800/80">No</th>
+                                    <th className="px-4 py-3 font-medium bg-zinc-100 dark:bg-zinc-800/80">검수 결과</th>
+                                    <th className="px-4 py-3 font-medium bg-zinc-200/50 dark:bg-zinc-700/50">매체</th>
+                                    <th className="px-4 py-3 font-medium bg-zinc-200/50 dark:bg-zinc-700/50">팀명</th>
+                                    <th className="px-4 py-3 font-medium bg-zinc-200/50 dark:bg-zinc-700/50">계정 ID</th>
+                                    <th className="px-4 py-3 font-medium bg-blue-50 dark:bg-blue-900/20">캠페인명</th>
+                                    <th className="px-4 py-3 font-medium bg-blue-50 dark:bg-blue-900/20 text-right">캠페인 일 예산</th>
+                                    <th className="px-4 py-3 font-medium bg-blue-50 dark:bg-blue-900/20 text-right">캠페인 예산</th>
                                     <th className="px-4 py-3 font-medium bg-zinc-200/50 dark:bg-zinc-700/50">시작일</th>
                                     <th className="px-4 py-3 font-medium bg-zinc-200/50 dark:bg-zinc-700/50">종료일</th>
-                                    <th className="px-4 py-3 font-medium bg-zinc-200/50 dark:bg-zinc-700/50">타겟팅 요약</th>
-                                    <th className="px-4 py-3 font-medium bg-zinc-200/50 dark:bg-zinc-700/50">최적화 목표</th>
-                                    <th className="px-4 py-3 font-medium">랜딩 URL</th>
-                                    <th className="px-4 py-3 font-medium">UTM 파라미터</th>
+                                    <th className="px-4 py-3 font-medium bg-indigo-50 dark:bg-indigo-900/20">광고 세트명</th>
+                                    <th className="px-4 py-3 font-medium bg-indigo-50 dark:bg-indigo-900/20 text-right">세트 일 예산</th>
+                                    <th className="px-4 py-3 font-medium bg-indigo-50 dark:bg-indigo-900/20 text-right">세트 예산</th>
+                                    <th className="px-4 py-3 font-medium bg-blue-50 dark:bg-blue-900/20">캠페인 목적</th>
+                                    <th className="px-4 py-3 font-medium bg-blue-50 dark:bg-blue-900/20">구매 유형</th>
+                                    <th className="px-4 py-3 font-medium bg-emerald-50 dark:bg-emerald-900/20">광고명</th>
+                                    <th className="px-4 py-3 font-medium bg-emerald-50 dark:bg-emerald-900/20">랜딩 URL</th>
+                                    <th className="px-4 py-3 font-medium bg-emerald-50 dark:bg-emerald-900/20">UTM 파라미터</th>
+                                    <th className="px-4 py-3 font-medium bg-indigo-50 dark:bg-indigo-900/20">최적화 목표</th>
+                                    <th className="px-4 py-3 font-medium bg-indigo-50 dark:bg-indigo-900/20">과금 기준</th>
+                                    <th className="px-4 py-3 font-medium bg-indigo-50 dark:bg-indigo-900/20">픽셀/이벤트</th>
+                                    <th className="px-4 py-3 font-medium bg-indigo-50 dark:bg-indigo-900/20">이벤트 유형</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
@@ -322,28 +327,39 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
                                                     {row.Platform || '미상'}
                                                 </span>
                                             </td>
-                                            <td className="px-4 py-3 font-semibold text-zinc-900 dark:text-zinc-200 max-w-[150px] truncate" title={row.CampaignName}>{row.CampaignName}</td>
-                                            <td className="px-4 py-3 text-zinc-500 max-w-[100px] truncate">{row.Objective}</td>
-                                            <td className="px-4 py-3 text-right font-medium text-zinc-600 dark:text-zinc-400">
-                                                <span className="text-[10px] text-zinc-400 mr-1">{row.Currency}</span>
-                                                {row.CampaignBudget > 0 ? row.CampaignBudget.toLocaleString() : '-'}
+                                            <td className="px-4 py-3 font-medium text-zinc-800 dark:text-zinc-200 truncate max-w-[100px]" title={row.Team}>{row.Team}</td>
+                                            <td className="px-4 py-3 font-mono text-zinc-500 text-[10px]">{row.AccountID}</td>
+                                            <td className="px-4 py-3 font-semibold text-zinc-900 dark:text-zinc-200 max-w-[150px] truncate bg-blue-50/20 dark:bg-blue-900/10" title={row.CampaignName}>{row.CampaignName}</td>
+                                            <td className="px-4 py-3 text-right font-medium text-zinc-600 dark:text-zinc-400 bg-blue-50/20 dark:bg-blue-900/10">
+                                                {row.CampaignDailyBudget > 0 ? row.CampaignDailyBudget.toLocaleString() : '-'}
                                             </td>
-                                            <td className="px-4 py-3 text-zinc-500 font-mono text-[10px]">{row.BuyingType}</td>
-
-                                            <td className="px-4 py-3 text-indigo-700 dark:text-indigo-300 font-medium max-w-[150px] truncate bg-zinc-50/50 dark:bg-zinc-800/30" title={row.AdSetName}>{row.AdSetName}</td>
-                                            <td className="px-4 py-3 text-right font-bold text-emerald-600 dark:text-emerald-400 bg-zinc-50/50 dark:bg-zinc-800/30">
-                                                <span className="text-[10px] text-emerald-600/50 dark:text-emerald-400/50 mr-1">{row.Currency}</span>
-                                                {row.AdSetBudget.toLocaleString()}
+                                            <td className="px-4 py-3 text-right font-medium text-zinc-600 dark:text-zinc-400 bg-blue-50/20 dark:bg-blue-900/10">
+                                                {row.CampaignLifetimeBudget > 0 ? row.CampaignLifetimeBudget.toLocaleString() : '-'}
                                             </td>
                                             <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400 text-[10px] bg-zinc-50/50 dark:bg-zinc-800/30">{row.StartDate}</td>
                                             <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400 text-[10px] bg-zinc-50/50 dark:bg-zinc-800/30">{row.EndDate}</td>
-                                            <td className="px-4 py-3 text-zinc-500 max-w-[150px] truncate text-[10px] bg-zinc-50/50 dark:bg-zinc-800/30" title={row.Targeting}>{row.Targeting}</td>
-                                            <td className="px-4 py-3 text-zinc-500 max-w-[100px] truncate text-[10px] bg-zinc-50/50 dark:bg-zinc-800/30">{row.Optimization}</td>
 
-                                            <td className="px-4 py-3 text-zinc-500 max-w-[150px] truncate" title={row.FinalURL}>
-                                                <a href={row.FinalURL} target="_blank" rel="noreferrer" className="hover:text-indigo-500 underline">{row.FinalURL}</a>
+                                            <td className="px-4 py-3 text-indigo-700 dark:text-indigo-300 font-medium max-w-[150px] truncate bg-indigo-50/20 dark:bg-indigo-900/10" title={row.AdSetName}>{row.AdSetName}</td>
+                                            <td className="px-4 py-3 text-right font-medium text-zinc-600 dark:text-zinc-400 bg-indigo-50/20 dark:bg-indigo-900/10">
+                                                {row.AdSetDailyBudget > 0 ? row.AdSetDailyBudget.toLocaleString() : '-'}
                                             </td>
-                                            <td className="px-4 py-3 text-zinc-500 font-mono text-[10px] max-w-[150px] truncate" title={row.UTMParameters}>{row.UTMParameters}</td>
+                                            <td className="px-4 py-3 text-right font-medium text-zinc-600 dark:text-zinc-400 bg-indigo-50/20 dark:bg-indigo-900/10">
+                                                {row.AdSetLifetimeBudget > 0 ? row.AdSetLifetimeBudget.toLocaleString() : '-'}
+                                            </td>
+
+                                            <td className="px-4 py-3 text-zinc-500 max-w-[100px] truncate bg-blue-50/20 dark:bg-blue-900/10">{row.CampaignObjective}</td>
+                                            <td className="px-4 py-3 text-zinc-500 font-mono text-[10px] bg-blue-50/20 dark:bg-blue-900/10">{row.CampaignBuyingType}</td>
+
+                                            <td className="px-4 py-3 font-semibold text-zinc-900 dark:text-zinc-200 max-w-[150px] truncate bg-emerald-50/20 dark:bg-emerald-900/10">{row.AdName}</td>
+                                            <td className="px-4 py-3 text-zinc-500 max-w-[150px] truncate bg-emerald-50/20 dark:bg-emerald-900/10" title={row.LandingURL}>
+                                                <a href={row.LandingURL} target="_blank" rel="noreferrer" className="hover:text-indigo-500 underline">{row.LandingURL}</a>
+                                            </td>
+                                            <td className="px-4 py-3 text-zinc-500 font-mono text-[10px] max-w-[150px] truncate bg-emerald-50/20 dark:bg-emerald-900/10" title={row.UTMParameters}>{row.UTMParameters}</td>
+
+                                            <td className="px-4 py-3 text-zinc-500 max-w-[100px] truncate text-[10px] bg-indigo-50/20 dark:bg-indigo-900/10">{row.AdSetOptimizationGoal}</td>
+                                            <td className="px-4 py-3 text-zinc-500 font-mono text-[10px] bg-indigo-50/20 dark:bg-indigo-900/10">{row.AdSetBillingEvent}</td>
+                                            <td className="px-4 py-3 text-zinc-500 font-mono text-[10px] bg-indigo-50/20 dark:bg-indigo-900/10">{row.PixelID}</td>
+                                            <td className="px-4 py-3 text-zinc-500 font-mono text-[10px] bg-indigo-50/20 dark:bg-indigo-900/10">{row.CustomEventType}</td>
                                         </tr>
                                     );
                                 })}

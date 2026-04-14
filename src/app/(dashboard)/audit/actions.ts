@@ -42,7 +42,7 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
         for (const act of accountIds) {
             try {
                 // Fetch AdSets along with their Campaign's budget
-                const adsetRes = await fetch(`https://graph.facebook.com/v19.0/act_${act}/adsets?fields=name,daily_budget,lifetime_budget,status,campaign_id,campaign{name,daily_budget,lifetime_budget},optimization_goal,billing_event,promoted_object&limit=500&access_token=${token}`);
+                const adsetRes = await fetch(`https://graph.facebook.com/v19.0/act_${act}/adsets?fields=name,daily_budget,lifetime_budget,status,campaign_id,campaign{name,daily_budget,lifetime_budget,start_time,stop_time,objective,buying_type},optimization_goal,billing_event,promoted_object&limit=500&access_token=${token}`);
                 const adsetData = await adsetRes.json();
 
                 // Fetch Ads for URL & UTM checking
@@ -81,34 +81,29 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
         if (status !== 'FAIL' && token && row.Platform.toUpperCase() === 'META') {
             const cache = liveMetaCache[row.AccountID];
             if (cache) {
-                // Find AdSet using trim and lower case for safety against spacing differences
-                const safeName = String(row.AdSetName || '').trim().toLowerCase();
-                const liveAdSet = cache.adsets.find((a: any) => String(a.name || '').trim().toLowerCase() === safeName);
+                // Find AdSet using absolute space removal for safety against Excel invisible non-breaking spaces
+                const safeName = String(row.AdSetName || '').replace(/\s+/g, '').toLowerCase();
+                const liveAdSet = cache.adsets.find((a: any) => String(a.name || '').replace(/\s+/g, '').toLowerCase() === safeName);
                 if (!liveAdSet) {
                     errors.push('매체에 일치하는 광고 세트가 없음');
                     status = 'FAIL';
                 } else {
                     // Budget Check (Support both Campaign Budget (CBO) and AdSet Budget (ABO))
-                    const isCentCurrency = ['USD', 'EUR', 'GBP'].includes((row.Currency || 'KRW').toUpperCase());
+                    const excelCampDaily = Number(String(row.CampaignDailyBudget || '').replace(/,/g, '').replace(/[^0-9.]/g, '').trim()) || 0;
+                    const excelCampLifetime = Number(String(row.CampaignLifetimeBudget || '').replace(/,/g, '').replace(/[^0-9.]/g, '').trim()) || 0;
+                    const excelCampBudget = excelCampDaily || excelCampLifetime || 0;
 
-                    const excelCampBudget = Number(String(row.CampaignBudget || '').replace(/,/g, '').replace(/[^0-9.]/g, '').trim()) || 0;
-                    const excelAdSetBudget = Number(String(row.AdSetBudget || '').replace(/,/g, '').replace(/[^0-9.]/g, '').trim()) || 0;
+                    const excelAdSetDaily = Number(String(row.AdSetDailyBudget || '').replace(/,/g, '').replace(/[^0-9.]/g, '').trim()) || 0;
+                    const excelAdSetLifetime = Number(String(row.AdSetLifetimeBudget || '').replace(/,/g, '').replace(/[^0-9.]/g, '').trim()) || 0;
+                    const excelAdSetBudget = excelAdSetDaily || excelAdSetLifetime || 0;
 
                     const liveCampDaily = Number(liveAdSet.campaign?.daily_budget) || 0;
                     const liveCampLifetime = Number(liveAdSet.campaign?.lifetime_budget) || 0;
-                    const liveCampRaw = liveCampDaily || liveCampLifetime || 0;
-                    const liveCampNormalized = isCentCurrency ? liveCampRaw / 100 : liveCampRaw;
+                    const liveCampNormalized = liveCampDaily || liveCampLifetime || 0;
 
                     const liveAdSetDaily = Number(liveAdSet.daily_budget) || 0;
                     const liveAdSetLifetime = Number(liveAdSet.lifetime_budget) || 0;
-                    const liveAdSetRaw = liveAdSetDaily || liveAdSetLifetime || 0;
-                    const liveAdSetNormalized = isCentCurrency ? liveAdSetRaw / 100 : liveAdSetRaw;
-
-                    console.log('--- Budget Check Debug ---');
-                    console.log('Row AdSetName:', row.AdSetName);
-                    console.log('Excel Camp Budget:', excelCampBudget);
-                    console.log('Live Camp Budget:', liveCampNormalized);
-                    console.log('Live Camp Fields:', liveAdSet.campaign);
+                    const liveAdSetNormalized = liveAdSetDaily || liveAdSetLifetime || 0;
 
                     if (excelCampBudget > 0) {
                         // Compare Campaign Budget (CBO)
@@ -133,13 +128,52 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                         status = 'FAIL';
                     }
 
-                    // Optimization & Billing
-                    if (row.Optimization && liveAdSet.optimization_goal !== row.Optimization) {
-                        errors.push(`최적화 목표 불일치 (기획안: ${row.Optimization}, 매체: ${liveAdSet.optimization_goal})`);
+                    // Campaign Dates
+                    const normalizeDate = (d: string) => d ? d.substring(0, 10).replace(/[^0-9-]/g, '') : '';
+                    if (row.StartDate && liveAdSet.campaign?.start_time) {
+                        const metaStart = normalizeDate(liveAdSet.campaign.start_time);
+                        const excelStart = normalizeDate(row.StartDate);
+                        if (metaStart !== excelStart && !liveAdSet.campaign.start_time.includes(excelStart)) {
+                            errors.push(`시작일 불일치 (기획안: ${excelStart}, 매체: ${metaStart})`);
+                            status = 'FAIL';
+                        }
+                    }
+                    if (row.EndDate && liveAdSet.campaign?.stop_time) {
+                        const metaStop = normalizeDate(liveAdSet.campaign.stop_time);
+                        const excelStop = normalizeDate(row.EndDate);
+                        if (metaStop !== excelStop && !liveAdSet.campaign.stop_time.includes(excelStop)) {
+                            errors.push(`종료일 불일치 (기획안: ${excelStop}, 매체: ${metaStop})`);
+                            status = 'FAIL';
+                        }
+                    }
+
+                    // Campaign Parameters
+                    if (row.CampaignObjective && liveAdSet.campaign?.objective !== row.CampaignObjective) {
+                        errors.push(`캠페인 목적 불일치 (기획안: ${row.CampaignObjective}, 매체: ${liveAdSet.campaign?.objective || '없음'})`);
                         status = 'FAIL';
                     }
-                    if (row.BillingEvent && liveAdSet.billing_event !== row.BillingEvent) {
-                        errors.push(`과금 기준 불일치 (기획안: ${row.BillingEvent}, 매체: ${liveAdSet.billing_event})`);
+                    if (row.CampaignBuyingType && liveAdSet.campaign?.buying_type !== row.CampaignBuyingType) {
+                        errors.push(`구매 유형 불일치 (기획안: ${row.CampaignBuyingType}, 매체: ${liveAdSet.campaign?.buying_type || '없음'})`);
+                        status = 'FAIL';
+                    }
+
+                    // Optimization & Billing
+                    if (row.AdSetOptimizationGoal && liveAdSet.optimization_goal !== row.AdSetOptimizationGoal) {
+                        errors.push(`최적화 목표 불일치 (기획안: ${row.AdSetOptimizationGoal}, 매체: ${liveAdSet.optimization_goal})`);
+                        status = 'FAIL';
+                    }
+                    if (row.AdSetBillingEvent && liveAdSet.billing_event !== row.AdSetBillingEvent) {
+                        errors.push(`과금 기준 불일치 (기획안: ${row.AdSetBillingEvent}, 매체: ${liveAdSet.billing_event})`);
+                        status = 'FAIL';
+                    }
+
+                    // Pixels and Events
+                    if (row.PixelID && liveAdSet.promoted_object?.pixel_id !== row.PixelID) {
+                        errors.push(`픽셀 ID 불일치 (기획안: ${row.PixelID}, 매체: ${liveAdSet.promoted_object?.pixel_id || '없음'})`);
+                        status = 'FAIL';
+                    }
+                    if (row.CustomEventType && liveAdSet.promoted_object?.custom_event_type !== row.CustomEventType) {
+                        errors.push(`이벤트 유형 불일치 (기획안: ${row.CustomEventType}, 매체: ${liveAdSet.promoted_object?.custom_event_type || '없음'})`);
                         status = 'FAIL';
                     }
 
@@ -167,9 +201,9 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                                 }
                             };
 
-                            if (row.FinalURL) {
+                            if (row.LandingURL) {
                                 const normMeta = normalizeUrl(metaLink);
-                                const normExcel = normalizeUrl(row.FinalURL);
+                                const normExcel = normalizeUrl(row.LandingURL);
                                 if (normMeta && normExcel && normMeta !== normExcel) {
                                     errors.push(`랜딩 URL 불일치 (매체: ${metaLink})`);
                                     status = 'FAIL';
@@ -196,8 +230,8 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
             }
         } else if (status !== 'FAIL' && !token && row.Platform.toUpperCase() === 'META') {
             // Mock Meta logic
-            const excelCampBudget = Number(String(row.CampaignBudget || '').replace(/,/g, '').replace(/[^0-9.]/g, '').trim()) || 0;
-            const excelAdSetBudget = Number(String(row.AdSetBudget || '').replace(/,/g, '').replace(/[^0-9.]/g, '').trim()) || 0;
+            const excelCampBudget = Number(String(row.CampaignLifetimeBudget || row.CampaignDailyBudget || '').replace(/,/g, '').replace(/[^0-9.]/g, '').trim()) || 0;
+            const excelAdSetBudget = Number(String(row.AdSetLifetimeBudget || row.AdSetDailyBudget || '').replace(/,/g, '').replace(/[^0-9.]/g, '').trim()) || 0;
 
             if (excelCampBudget > 0 && excelCampBudget < 1000) {
                 errors.push('캠페인 예산이 비정상적으로 낮습니다.');
