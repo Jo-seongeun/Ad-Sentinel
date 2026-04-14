@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@/utils/supabase/server';
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { ParsedRow, AuditResult } from './AuditClientUI';
 
 export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResult[]> {
@@ -18,11 +19,16 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
     const isAdmin = myUser?.role === 'SUPER_ADMIN' || myUser?.role === 'ADMIN';
     const myTeamName = (myUser?.teams as any)?.name;
 
-    // Fetch Meta Token
-    const { data: tokenData } = await supabase
+    // Fetch Meta Token using Service Role to bypass RLS for background validation validation
+    const adminClient = createSupabaseClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    const { data: tokenData } = await adminClient
         .from('platform_settings')
         .select('*')
-        .eq('id', 'META')
+        .eq('platform', 'META')
         .single();
 
     const token = tokenData?.access_token;
