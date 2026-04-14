@@ -25,7 +25,7 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
         .eq('id', 'META')
         .single();
 
-    const token = tokenData?.access_token;
+    const token = tokenData?.access_token || process.env.META_ACCESS_TOKEN;
 
     // Group rows by AccountID for efficiency
     const accountIds = [...new Set(rows.map(r => r.AccountID).filter(Boolean))];
