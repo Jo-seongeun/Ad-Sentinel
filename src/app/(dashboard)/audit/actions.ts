@@ -25,7 +25,7 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
         .eq('id', 'META')
         .single();
 
-    const token = tokenData?.access_token || process.env.META_ACCESS_TOKEN;
+    const token = tokenData?.access_token;
 
     // Group rows by AccountID for efficiency
     const accountIds = [...new Set(rows.map(r => r.AccountID).filter(Boolean))];
@@ -75,8 +75,9 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
         if (status !== 'FAIL' && token && row.Platform.toUpperCase() === 'META') {
             const cache = liveMetaCache[row.AccountID];
             if (cache) {
-                // Find AdSet
-                const liveAdSet = cache.adsets.find((a: any) => a.name === row.AdSetName);
+                // Find AdSet using trim and lower case for safety against spacing differences
+                const safeName = String(row.AdSetName || '').trim().toLowerCase();
+                const liveAdSet = cache.adsets.find((a: any) => String(a.name || '').trim().toLowerCase() === safeName);
                 if (!liveAdSet) {
                     errors.push('매체에 일치하는 광고 세트가 없음');
                     status = 'FAIL';
@@ -138,7 +139,8 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
 
                     // Check Ad Level (URL and UTM)
                     if (row.AdName) {
-                        const liveAd = cache.ads.find((a: any) => a.name === row.AdName && a.adset_id === liveAdSet.id);
+                        const safeAdName = String(row.AdName || '').trim().toLowerCase();
+                        const liveAd = cache.ads.find((a: any) => String(a.name || '').trim().toLowerCase() === safeAdName && a.adset_id === liveAdSet.id);
                         if (!liveAd) {
                             errors.push(`매체에 일치하는 광고가 없음 (${row.AdName})`);
                             status = 'FAIL';
