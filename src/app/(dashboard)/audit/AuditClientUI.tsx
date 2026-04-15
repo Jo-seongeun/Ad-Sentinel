@@ -125,6 +125,25 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
                     return Number(cleanVal) || 0;
                 };
 
+                const parseDate = (val: any) => {
+                    if (!val) return '';
+                    if (typeof val === 'number') {
+                        // Excel serial date bug (1900 leap year)
+                        const utc_days = Math.floor(val - 25569);
+                        const dateObj = new Date(utc_days * 86400 * 1000);
+                        return dateObj.toISOString().split('T')[0];
+                    }
+                    if (typeof val === 'string') {
+                        // Sometimes the raw mode skips formatting but sends it as a string
+                        if (!isNaN(Number(val)) && Number(val) > 10000) {
+                            const utc_days = Math.floor(Number(val) - 25569);
+                            const dateObj = new Date(utc_days * 86400 * 1000);
+                            return dateObj.toISOString().split('T')[0];
+                        }
+                    }
+                    return String(val).trim();
+                };
+
                 const mappedData: ParsedRow[] = data.map(item => ({
                     Platform: item['매체'] || '',
                     Team: item['팀명'] || '',
@@ -132,9 +151,9 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
                     CampaignName: item['캠페인명'] || '',
                     CampaignDailyBudget: parseBudget(item['캠페인 일 예산']),
                     CampaignLifetimeBudget: parseBudget(item['캠페인 예산']),
-                    StartDate: item['시작일'] || '',
-                    EndDate: item['종료일'] || '',
-                    AdSetName: item['광고 세트명'] || '',
+                    StartDate: parseDate(item['시작일']),
+                    EndDate: parseDate(item['종료일']),
+                    AdSetName: item['광고 세트명'] || item['광고 세트/그룹명'] || '',
                     AdSetDailyBudget: parseBudget(item['광고 세트 일 예산']),
                     AdSetLifetimeBudget: parseBudget(item['광고 세트 예산']),
                     CampaignObjective: item['캠페인 목적'] || '',
