@@ -140,6 +140,23 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
                             const dateObj = new Date(utc_days * 86400 * 1000);
                             return dateObj.toISOString().split('T')[0];
                         }
+                        // Handle slash dates like "3/31/26" or "2026/04/13"
+                        if (val.includes('/')) {
+                            const parts = val.split('/');
+                            if (parts.length === 3) {
+                                let y = parts[2];
+                                let m = parts[0];
+                                let d = parts[1];
+                                // if first part is YYYY
+                                if (parts[0].length === 4) {
+                                    y = parts[0]; m = parts[1]; d = parts[2];
+                                } else if (parts[2].length === 2) {
+                                    // if year is YY, assume 2000s
+                                    y = '20' + parts[2];
+                                }
+                                return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+                            }
+                        }
                     }
                     return String(val).trim();
                 };

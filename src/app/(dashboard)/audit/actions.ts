@@ -94,7 +94,11 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
             if (cache) {
                 // Find AdSet using absolute space removal for safety against Excel invisible non-breaking spaces
                 const safeName = String(row.AdSetName || '').replace(/\s+/g, '').toLowerCase();
-                const liveAdSet = cache.adsets.find((a: any) => String(a.name || '').replace(/\s+/g, '').toLowerCase() === safeName);
+                const safeCampName = String(row.CampaignName || '').replace(/\s+/g, '').toLowerCase();
+                const liveAdSet = cache.adsets.find((a: any) =>
+                    String(a.name || '').replace(/\s+/g, '').toLowerCase() === safeName &&
+                    String(a.campaign?.name || '').replace(/\s+/g, '').toLowerCase() === safeCampName
+                );
                 if (!liveAdSet) {
                     errors.push('매체에 일치하는 광고 세트가 없음');
                     status = 'FAIL';
