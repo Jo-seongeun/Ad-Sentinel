@@ -33,8 +33,13 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
 
     const token = tokenData?.access_token;
 
-    // Group rows by AccountID for efficiency
-    const accountIds = [...new Set(rows.map(r => r.AccountID).filter(Boolean))];
+    // Group rows by AccountID for efficiency and sanitize to strictly numbers
+    const processedRows = rows.map(r => ({
+        ...r,
+        AccountID: r.AccountID ? r.AccountID.replace(/[^0-9]/g, '') : ''
+    }));
+
+    const accountIds = [...new Set(processedRows.map(r => r.AccountID).filter(Boolean))];
     const liveMetaCache: Record<string, any> = {};
 
     // If token exists, we fetch exactly what they need from Meta Graph API
@@ -42,11 +47,17 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
         for (const act of accountIds) {
             try {
                 // Fetch AdSets along with their Campaign's budget
-                const adsetRes = await fetch(`https://graph.facebook.com/v19.0/act_${act}/adsets?fields=name,daily_budget,lifetime_budget,status,campaign_id,campaign{name,daily_budget,lifetime_budget,start_time,stop_time,objective,buying_type},optimization_goal,billing_event,promoted_object&limit=500&access_token=${token}`);
+                const adsetRes = await fetch(
+                    `https://graph.facebook.com/v19.0/act_${act}/adsets?fields=name,daily_budget,lifetime_budget,status,campaign_id,campaign{name,daily_budget,lifetime_budget,start_time,stop_time,objective,buying_type},optimization_goal,billing_event,promoted_object&limit=500&access_token=${token}`,
+                    { cache: 'no-store' }
+                );
                 const adsetData = await adsetRes.json();
 
                 // Fetch Ads for URL & UTM checking
-                const adsRes = await fetch(`https://graph.facebook.com/v19.0/act_${act}/ads?fields=name,adset_id,creative{url_tags,object_story_spec},status&limit=500&access_token=${token}`);
+                const adsRes = await fetch(
+                    `https://graph.facebook.com/v19.0/act_${act}/ads?fields=name,adset_id,creative{url_tags,object_story_spec},status&limit=500&access_token=${token}`,
+                    { cache: 'no-store' }
+                );
                 const adsData = await adsRes.json();
 
                 liveMetaCache[act] = { adsets: adsetData.data || [], ads: adsData.data || [] };
@@ -60,8 +71,8 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
     const results: AuditResult[] = [];
 
     // Process Each Row
-    for (let i = 0; i < rows.length; i++) {
-        const row = rows[i];
+    for (let i = 0; i < processedRows.length; i++) {
+        const row = processedRows[i];
         const errors: string[] = [];
         let status: 'PASS' | 'FAIL' | 'WARNING' = 'PASS';
 
