@@ -18,14 +18,20 @@ if not SUPABASE_URL or not SUPABASE_KEY or not META_TOKEN:
     exit(1)
 
 # 3. Meta API 기본 정보 세팅
-ACCOUNT_ID = '1777607596977990'
+ACCOUNT_ID = '851125950859042'
 API_VERSION = 'v19.0'
 BASE_URL = f"https://graph.facebook.com/{API_VERSION}"
 
 print(f"[Success] 접속 계정: {ACCOUNT_ID}")
 
+# 3.5. Meta Ads API 계정 화폐(Currency) 확인
+acc_url = f"{BASE_URL}/act_{ACCOUNT_ID}?fields=currency"
+acc_res = requests.get(acc_url, params={'access_token': META_TOKEN}, verify=False)
+account_currency = acc_res.json().get('currency', 'KRW') # Default to KRW if none
+print(f"[Success] 계정 통화 기준: {account_currency}")
+
 # 4. Meta Ads API 요청 (ACTIVE 캠페인에 속하는 소재만 추출)
-fields = "id,name,effective_status,creative{url_tags,object_story_spec},adset{id,name,daily_budget,lifetime_budget,optimization_goal,billing_event,promoted_object},campaign{id,name,daily_budget,lifetime_budget,start_time,stop_time,objective,buying_type}"
+fields = "id,name,effective_status,creative{url_tags,object_story_spec},adset{id,name,daily_budget,lifetime_budget,optimization_goal,billing_event,promoted_object,targeting},campaign{id,name,daily_budget,lifetime_budget,start_time,stop_time,objective,buying_type}"
 url = f"{BASE_URL}/act_{ACCOUNT_ID}/ads"
 params = {
     'fields': fields,
@@ -73,6 +79,7 @@ for ad in ads_data:
     record = {
         'account_id': ACCOUNT_ID,
         'campaign_id': campaign.get('id'),
+        'currency': account_currency,
         'campaign_name': campaign.get('name'),
         'campaign_daily_budget': int(campaign.get('daily_budget', 0)) if campaign.get('daily_budget') else 0,
         'campaign_lifetime_budget': int(campaign.get('lifetime_budget', 0)) if campaign.get('lifetime_budget') else 0,
@@ -88,6 +95,7 @@ for ad in ads_data:
         'adset_billing_event': adset.get('billing_event'),
         'adset_pixel_id': promoted_object.get('pixel_id') if isinstance(promoted_object, dict) else None,
         'adset_custom_event_type': promoted_object.get('custom_event_type') if isinstance(promoted_object, dict) else None,
+        'adset_targeting': adset.get('targeting'),
         'ad_id': ad.get('id'),
         'ad_name': ad.get('name'),
         'landing_url': meta_link,

@@ -2,6 +2,7 @@
 CREATE TABLE IF NOT EXISTS public.campaign_settings_check (
     id SERIAL PRIMARY KEY,
     campaign_id TEXT,
+    currency TEXT,
     campaign_name TEXT,
     campaign_daily_budget BIGINT,
     campaign_lifetime_budget BIGINT,
@@ -23,6 +24,7 @@ CREATE TABLE IF NOT EXISTS public.campaign_settings_check (
     adset_billing_event TEXT,
     adset_pixel_id TEXT,
     adset_custom_event_type TEXT,
+    adset_targeting JSONB,
     scraped_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
 

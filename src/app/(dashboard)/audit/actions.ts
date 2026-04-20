@@ -60,7 +60,14 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                 );
                 const adsData = await adsRes.json();
 
-                liveMetaCache[act] = { adsets: adsetData.data || [], ads: adsData.data || [] };
+                // Fetch Account Currency
+                const accRes = await fetch(
+                    `https://graph.facebook.com/v19.0/act_${act}?fields=currency&access_token=${token}`,
+                    { cache: 'no-store' }
+                );
+                const accData = await accRes.json();
+
+                liveMetaCache[act] = { adsets: adsetData.data || [], ads: adsData.data || [], currency: accData.currency || 'KRW' };
             } catch (error) {
                 console.error(`Meta API Error for Act ${act}:`, error);
                 liveMetaCache[act] = { adsets: [], ads: [] };
@@ -103,6 +110,16 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                     errors.push('매체에 일치하는 광고 세트가 없음');
                     status = 'FAIL';
                 } else {
+                    // Currency Check
+                    if (row.Currency) {
+                        const safeCurrency = row.Currency.toUpperCase().trim();
+                        const liveCurrency = (cache.currency || 'KRW').toUpperCase();
+                        if (safeCurrency !== liveCurrency) {
+                            errors.push(`통화 불일치 (기획안: ${safeCurrency}, 매체: ${liveCurrency})`);
+                            status = 'FAIL';
+                        }
+                    }
+
                     // Budget Check (Support both Campaign Budget (CBO) and AdSet Budget (ABO))
                     const excelCampDaily = Number(String(row.CampaignDailyBudget || '').replace(/,/g, '').replace(/[^0-9.]/g, '').trim()) || 0;
                     const excelCampLifetime = Number(String(row.CampaignLifetimeBudget || '').replace(/,/g, '').replace(/[^0-9.]/g, '').trim()) || 0;
@@ -245,6 +262,14 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
             }
         } else if (status !== 'FAIL' && !token && row.Platform.toUpperCase() === 'META') {
             // Mock Meta logic
+            if (row.Currency) {
+                const safeCurrency = row.Currency.toUpperCase().trim();
+                if (safeCurrency !== 'KRW') {
+                    errors.push(`통화 불일치 (기획안: ${safeCurrency}, 매체: KRW)`);
+                    status = 'FAIL';
+                }
+            }
+
             const excelCampBudget = Number(String(row.CampaignLifetimeBudget || row.CampaignDailyBudget || '').replace(/,/g, '').replace(/[^0-9.]/g, '').trim()) || 0;
             const excelAdSetBudget = Number(String(row.AdSetLifetimeBudget || row.AdSetDailyBudget || '').replace(/,/g, '').replace(/[^0-9.]/g, '').trim()) || 0;
 

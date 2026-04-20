@@ -10,6 +10,7 @@ export interface ParsedRow {
     Team: string;
     AccountID: string;
     CampaignName: string;
+    Currency: string;
     CampaignDailyBudget: number;
     CampaignLifetimeBudget: number;
     StartDate: string;
@@ -48,7 +49,7 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
         e.stopPropagation(); // 드래그 앤 드롭 클릭 이벤트 방지
         const headers = [
             '매체', '팀명', '계정 ID',
-            '캠페인명', '캠페인 일 예산', '캠페인 예산', '시작일', '종료일',
+            '캠페인명', '통화', '캠페인 일 예산', '캠페인 예산', '시작일', '종료일',
             '광고 세트명', '광고 세트 일 예산', '광고 세트 예산',
             '캠페인 목적', '구매 유형', '광고명', '랜딩 URL', 'UTM 파라미터',
             '최적화 목표', '과금 기준', '픽셀/이벤트', '이벤트 유형'
@@ -56,14 +57,14 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
 
         const mockData1 = [
             'Meta', teamName || '소속 팀명 입력', '1777607596977990',
-            '24년_봄_프로모션_캠페인', '500000', '10000000', '2024-04-01', '2024-04-30',
+            '24년_봄_프로모션_캠페인', 'KRW', '500000', '10000000', '2024-04-01', '2024-04-30',
             '세트_A_타겟', '', '2000000',
             'OUTCOME_SALES', 'AUCTION', '이미지_소재_1', 'https://example.com/spring', 'utm_source=fb&utm_medium=cpa',
             'CONVERSIONS', 'IMPRESSIONS', '123456789', 'Purchase'
         ];
         const mockData2 = [
             'Meta', teamName || '소속 팀명 입력', '1777607596977990',
-            '24년_가을_프로모션_캠페인', '', '20000000', '2024-09-01', '2024-09-30',
+            '24년_가을_프로모션_캠페인', 'KRW', '', '20000000', '2024-09-01', '2024-09-30',
             '세트_B_타겟', '50000', '',
             'OUTCOME_TRAFFIC', 'AUCTION', '참여유도_소재_A', 'https://example.com/fall', 'utm_source=fb&utm_medium=cpc',
             'LINK_CLICKS', 'IMPRESSIONS', '', ''
@@ -166,6 +167,7 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
                     Team: item['팀명'] || '',
                     AccountID: item['계정 ID']?.toString() || '',
                     CampaignName: item['캠페인명'] || '',
+                    Currency: item['통화'] || '',
                     CampaignDailyBudget: parseBudget(item['캠페인 일 예산']),
                     CampaignLifetimeBudget: parseBudget(item['캠페인 예산']),
                     StartDate: parseDate(item['시작일']),
