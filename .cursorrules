@@ -7,3 +7,5 @@ Strictly follow this format:
 git add .
 git commit -m '업데이트: [여기에 수정된 내용을 한글로 요약해서 넣으세요]'
 git push origin master
+npx vercel --prod --yes --token $VERCEL_TOKEN
+```

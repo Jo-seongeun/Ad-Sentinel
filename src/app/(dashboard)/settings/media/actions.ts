@@ -102,7 +102,7 @@ export async function testGoogleConnectionAction(
         const currentAccessToken = tokenData.access_token;
 
         // 2. Ping Google Ads API (List Accessible Customers)
-        const adsRes = await fetch('https://googleads.googleapis.com/v18/customers:listAccessibleCustomers', {
+        const adsRes = await fetch('https://googleads.googleapis.com/v22/customers:listAccessibleCustomers', {
             method: 'GET',
             cache: 'no-store',
             headers: {
