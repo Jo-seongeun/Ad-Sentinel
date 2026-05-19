@@ -90,13 +90,89 @@ export default async function AccountMappingPage() {
         metaApiError = "Meta API 토큰이 설정되지 않았습니다. 매체 연동 관리 메뉴에서 먼저 설정해주세요.";
     }
 
-    // Include existing Database mappings that might be GOOGLE or other platforms, or Meta accounts we lost access to
-    // But for this MVP, we mainly rely on live Meta accounts and append any GOOGLE mock data if needed.
-    // Let's add Google Mock Data so the UI isn't completely empty if Meta fails, just to demonstrate multi-platform UI
-    initialAccounts.push(
-        { id: 'act_g_101', name: 'Google 검색어 확장 그룹 A', platform: 'GOOGLE', assignedTeamId: mappings.find(m => m.ad_account_id === 'act_g_101')?.team_id || null },
-        { id: 'act_g_102', name: 'Google PMax 캠페인 테스트 계정', platform: 'GOOGLE', assignedTeamId: mappings.find(m => m.ad_account_id === 'act_g_102')?.team_id || null }
-    );
+    // 5. Fetch All Google Ads Client Accounts
+    let googleApiError = null;
+    const { data: googleSetting } = await supabase.from('platform_settings').select('*').eq('platform', 'GOOGLE_ADS').single();
+    if (googleSetting && googleSetting.refresh_token) {
+        try {
+            const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+                method: 'POST',
+                cache: 'no-store',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({
+                    client_id: googleSetting.app_id.trim(),
+                    client_secret: googleSetting.app_secret.trim(),
+                    refresh_token: googleSetting.refresh_token.trim(),
+                    grant_type: 'refresh_token',
+                }).toString(),
+            });
+            const tokenData = await tokenRes.json();
+            
+            if (!tokenRes.ok || !tokenData.access_token) {
+                throw new Error(tokenData.error_description || tokenData.error || '토큰 발급 실패');
+            }
+            
+            const googleAccessToken = tokenData.access_token;
+            const mccId = googleSetting.business_id?.replace(/-/g, '') || '';
+            const devToken = googleSetting.access_token?.trim() || '';
+
+            const query = `
+                SELECT 
+                    customer_client.client_customer,
+                    customer_client.level,
+                    customer_client.descriptive_name,
+                    customer_client.id
+                FROM customer_client
+                WHERE customer_client.status = 'ENABLED' AND customer_client.hidden = FALSE
+            `;
+
+            const googleRes = await fetch(`https://googleads.googleapis.com/v22/customers/${mccId}/googleAds:searchStream`, {
+                method: 'POST',
+                headers: {
+                    'developer-token': devToken,
+                    'Authorization': `Bearer ${googleAccessToken}`,
+                    'login-customer-id': mccId,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ query })
+            });
+
+            if (!googleRes.ok) {
+                const errData = await googleRes.json();
+                let detailMsg = '';
+                if (errData[0]?.error?.details?.[0]?.errors?.[0]?.message) {
+                    detailMsg = errData[0].error.details[0].errors[0].message;
+                } else if (errData.error?.details?.[0]?.errors?.[0]?.message) {
+                    detailMsg = errData.error.details[0].errors[0].message;
+                }
+                throw new Error(detailMsg || errData.error?.message || errData[0]?.error?.message || 'Google API 호출 오류');
+            }
+
+            const streamData = await googleRes.json();
+            for (const chunk of streamData) {
+                if (chunk.results) {
+                    for (const row of chunk.results) {
+                        if (row.customerClient && row.customerClient.id) {
+                            const cid = row.customerClient.id;
+                            const name = row.customerClient.descriptiveName || `Google Ads Account (${cid})`;
+                            
+                            const mappedInfo = mappings.find(m => m.ad_account_id === cid && m.platform === 'GOOGLE');
+                            initialAccounts.push({
+                                id: cid,
+                                name: name,
+                                platform: 'GOOGLE',
+                                assignedTeamId: mappedInfo ? mappedInfo.team_id : null
+                            });
+                        }
+                    }
+                }
+            }
+        } catch (e: any) {
+            googleApiError = e.message;
+        }
+    } else {
+        googleApiError = "Google Ads 토큰이 설정되지 않았습니다. 매체 연동 관리 메뉴에서 먼저 설정해주세요.";
+    }
 
     return (
         <div className="animate-in fade-in duration-500 h-[calc(100vh-6rem)] flex flex-col">
@@ -108,6 +184,14 @@ export default async function AccountMappingPage() {
                         <AlertCircle className="w-5 h-5 shrink-0" />
                         <div>
                             <strong>Meta API 연동 오류:</strong> {metaApiError}
+                        </div>
+                    </div>
+                )}
+                {googleApiError && (
+                    <div className="mt-3 bg-red-50 dark:bg-rose-900/20 text-red-700 dark:text-rose-400 p-3 rounded-lg text-sm flex items-start gap-2 border border-red-200 dark:border-rose-800">
+                        <AlertCircle className="w-5 h-5 shrink-0" />
+                        <div>
+                            <strong>Google Ads API 연동 오류:</strong> {googleApiError}
                         </div>
                     </div>
                 )}
