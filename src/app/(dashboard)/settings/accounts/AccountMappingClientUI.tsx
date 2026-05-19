@@ -119,12 +119,12 @@ export default function AccountMappingClientUI({ initialAccounts, teams }: Props
             )}
 
             {/* LEFT COLUMN */}
-            <div className="w-[30%] flex flex-col bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden shadow-sm">
+            <div className="w-[40%] flex flex-col bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden shadow-sm">
                 <div className="flex flex-col border-b border-zinc-200 dark:border-zinc-800">
-                    <div className="flex items-center gap-2 p-2 bg-zinc-50/50 dark:bg-zinc-800/20">
-                        <button onClick={() => { setLeftPlatformFilter('ALL'); deselectAllLeft(); }} className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-colors ${leftPlatformFilter === 'ALL' ? 'bg-white dark:bg-zinc-800 shadow-sm text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-700' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>전체</button>
-                        <button onClick={() => { setLeftPlatformFilter('META'); deselectAllLeft(); }} className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-colors ${leftPlatformFilter === 'META' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800/50' : 'text-zinc-500 hover:text-blue-600 dark:hover:text-blue-400'}`}>Meta API 연동완료</button>
-                        <button onClick={() => { setLeftPlatformFilter('GOOGLE'); deselectAllLeft(); }} className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-colors ${leftPlatformFilter === 'GOOGLE' ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800/50' : 'text-zinc-500 hover:text-green-600 dark:hover:text-green-400'}`}>Google Ads 연동완료</button>
+                    <div className="flex items-center gap-2 p-2 bg-zinc-50/50 dark:bg-zinc-800/20 overflow-x-auto hide-scrollbar">
+                        <button onClick={() => { setLeftPlatformFilter('ALL'); deselectAllLeft(); }} className={`flex-1 whitespace-nowrap px-2 py-1.5 text-xs font-semibold rounded-md transition-colors ${leftPlatformFilter === 'ALL' ? 'bg-white dark:bg-zinc-800 shadow-sm text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-700' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>전체</button>
+                        <button onClick={() => { setLeftPlatformFilter('META'); deselectAllLeft(); }} className={`flex-1 whitespace-nowrap px-2 py-1.5 text-xs font-semibold rounded-md transition-colors ${leftPlatformFilter === 'META' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800/50' : 'text-zinc-500 hover:text-blue-600 dark:hover:text-blue-400'}`}>Meta API 연동완료</button>
+                        <button onClick={() => { setLeftPlatformFilter('GOOGLE'); deselectAllLeft(); }} className={`flex-1 whitespace-nowrap px-2 py-1.5 text-xs font-semibold rounded-md transition-colors ${leftPlatformFilter === 'GOOGLE' ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800/50' : 'text-zinc-500 hover:text-green-600 dark:hover:text-green-400'}`}>Google Ads 연동완료</button>
                     </div>
 
                     <div className="p-3 flex flex-col gap-3">
@@ -185,7 +185,7 @@ export default function AccountMappingClientUI({ initialAccounts, teams }: Props
             </div>
 
             {/* MIDDLE COLUMN: Team List */}
-            <div className="w-[30%] flex flex-col bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden shadow-sm">
+            <div className="w-[25%] flex flex-col bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden shadow-sm">
                 <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/20">
                     <h3 className="font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                         팀 리스트
