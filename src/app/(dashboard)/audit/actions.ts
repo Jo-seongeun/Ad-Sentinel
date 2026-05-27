@@ -102,10 +102,19 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                 // Find AdSet using absolute space removal for safety against Excel invisible non-breaking spaces
                 const safeName = String(row.AdSetName || '').replace(/\s+/g, '').toLowerCase();
                 const safeCampName = String(row.CampaignName || '').replace(/\s+/g, '').toLowerCase();
-                const liveAdSet = cache.adsets.find((a: any) =>
-                    String(a.name || '').replace(/\s+/g, '').toLowerCase() === safeName &&
-                    String(a.campaign?.name || '').replace(/\s+/g, '').toLowerCase() === safeCampName
-                );
+                const safeCampId = String(row.CampaignID || '').replace(/\s+/g, '');
+
+                // If CampaignID is provided in excel, match by ID (more precise). Otherwise fall back to name matching.
+                const liveAdSet = cache.adsets.find((a: any) => {
+                    const adSetNameMatch = String(a.name || '').replace(/\s+/g, '').toLowerCase() === safeName;
+                    if (safeCampId) {
+                        // ID-based campaign matching (CampaignID is optional, not required)
+                        return adSetNameMatch && a.campaign_id === safeCampId;
+                    } else {
+                        // Fallback: name-based campaign matching
+                        return adSetNameMatch && String(a.campaign?.name || '').replace(/\s+/g, '').toLowerCase() === safeCampName;
+                    }
+                });
                 if (!liveAdSet) {
                     errors.push('매체에 일치하는 광고 세트가 없음');
                     status = 'FAIL';
