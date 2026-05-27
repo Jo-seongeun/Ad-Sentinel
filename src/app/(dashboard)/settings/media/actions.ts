@@ -121,7 +121,14 @@ export async function testGoogleConnectionAction(
         }
 
         if (adsData.error) {
-            return { valid: false, message: `Google Ads API 오류: ${adsData.error.message}` };
+            let detailMsg = '';
+            if (adsData.error.details && adsData.error.details.length > 0) {
+                const failure = adsData.error.details.find((d: any) => d.errors);
+                if (failure && failure.errors.length > 0) {
+                    detailMsg = failure.errors[0].message || '';
+                }
+            }
+            return { valid: false, message: `Google Ads API 오류: ${detailMsg || adsData.error.message}` };
         }
 
         // Extract customer Resource Names (e.g. customers/1234567890)
