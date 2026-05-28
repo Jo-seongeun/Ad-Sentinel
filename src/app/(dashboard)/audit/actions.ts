@@ -33,6 +33,35 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
 
     const token = tokenData?.access_token;
 
+    // Fetch Google Ads settings
+    const { data: googleSettings } = await adminClient
+        .from('platform_settings')
+        .select('*')
+        .eq('platform', 'GOOGLE_ADS')
+        .single();
+
+    let googleAccessToken: string | null = null;
+    const liveGoogleCache: Record<string, any> = {};
+
+    if (googleSettings?.refresh_token) {
+        try {
+            const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({
+                    client_id: googleSettings.app_id.trim(),
+                    client_secret: googleSettings.app_secret.trim(),
+                    refresh_token: googleSettings.refresh_token.trim(),
+                    grant_type: 'refresh_token',
+                }).toString(),
+            });
+            const tokenJson = await tokenRes.json();
+            googleAccessToken = tokenJson.access_token || null;
+        } catch (e) {
+            console.error('Google Ads Token Error:', e);
+        }
+    }
+
     // Group rows by AccountID for efficiency and sanitize to strictly numbers
     const processedRows = rows.map(r => ({
         ...r,
@@ -71,6 +100,100 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
             } catch (error) {
                 console.error(`Meta API Error for Act ${act}:`, error);
                 liveMetaCache[act] = { adsets: [], ads: [] };
+            }
+        }
+    }
+
+    // Fetch Google Ads live data per account (only for rows with GOOGLE_ADS platform)
+    if (googleAccessToken && googleSettings) {
+        const googleAccountIds = [...new Set(
+            processedRows
+                .filter(r => r.Platform.toUpperCase().includes('GOOGLE'))
+                .map(r => r.AccountID.replace(/-/g, ''))
+                .filter(Boolean)
+        )];
+        const mccId = (googleSettings.business_id || '').replace(/-/g, '');
+        const devToken = (googleSettings.access_token || '').trim();
+
+        for (const custId of googleAccountIds) {
+            try {
+                const gaqlHeaders: Record<string, string> = {
+                    'Authorization': `Bearer ${googleAccessToken}`,
+                    'developer-token': devToken,
+                    'Content-Type': 'application/json',
+                };
+                if (mccId) gaqlHeaders['login-customer-id'] = mccId;
+
+                // 1. Campaign budget query (separate due to GAQL join restriction)
+                const budgetQuery = `SELECT campaign.id, campaign_budget.amount_micros, campaign_budget.total_amount_micros FROM campaign WHERE campaign.status = 'ENABLED'`;
+                const budgetRes = await fetch(
+                    `https://googleads.googleapis.com/v22/customers/${custId}/googleAds:searchStream`,
+                    { method: 'POST', headers: gaqlHeaders, body: JSON.stringify({ query: budgetQuery }) }
+                );
+                const budgetData = await budgetRes.json();
+                const budgetsDict: Record<string, any> = {};
+                if (Array.isArray(budgetData)) {
+                    for (const chunk of budgetData) {
+                        for (const r of (chunk.results || [])) {
+                            const cid = r.campaign?.id;
+                            if (cid) budgetsDict[cid] = r.campaignBudget || {};
+                        }
+                    }
+                }
+
+                // 2. Ad group + ad query
+                const adQuery = `SELECT customer.currency_code, campaign.id, campaign.name, campaign.status, campaign.advertising_channel_type, campaign.start_date, campaign.end_date, ad_group.id, ad_group.name, ad_group.status, ad_group_ad.ad.id, ad_group_ad.ad.name, ad_group_ad.status, ad_group_ad.ad.final_urls, ad_group_ad.ad.tracking_url_template FROM ad_group_ad WHERE ad_group_ad.status = 'ENABLED' AND campaign.status = 'ENABLED' AND ad_group.status = 'ENABLED' LIMIT 1000`;
+                const adRes = await fetch(
+                    `https://googleads.googleapis.com/v22/customers/${custId}/googleAds:searchStream`,
+                    { method: 'POST', headers: gaqlHeaders, body: JSON.stringify({ query: adQuery }) }
+                );
+                const adData = await adRes.json();
+
+                const campaigns: any[] = [];
+                const adGroups: any[] = [];
+                const ads: any[] = [];
+                let currency = 'KRW';
+
+                if (Array.isArray(adData)) {
+                    for (const chunk of adData) {
+                        for (const r of (chunk.results || [])) {
+                            currency = r.customer?.currencyCode || currency;
+                            const camp = r.campaign || {};
+                            const adGroup = r.adGroup || {};
+                            const adGroupAd = r.adGroupAd || {};
+                            const ad = adGroupAd.ad || {};
+                            const budget = budgetsDict[camp.id] || {};
+
+                            // Build flat campaign record (deduplicate by campaign id)
+                            if (!campaigns.find((c: any) => c.id === camp.id)) {
+                                campaigns.push({
+                                    id: camp.id,
+                                    name: camp.name,
+                                    startDate: camp.startDate,
+                                    endDate: camp.endDate,
+                                    channelType: camp.advertisingChannelType,
+                                    dailyBudget: Math.round((Number(budget.amountMicros) || 0) / 1000000),
+                                    lifetimeBudget: Math.round((Number(budget.totalAmountMicros) || 0) / 1000000),
+                                });
+                            }
+                            if (!adGroups.find((ag: any) => ag.id === adGroup.id)) {
+                                adGroups.push({ id: adGroup.id, name: adGroup.name, campaignId: camp.id });
+                            }
+                            ads.push({
+                                id: ad.id,
+                                name: ad.name,
+                                adGroupId: adGroup.id,
+                                finalUrls: ad.finalUrls || [],
+                                trackingUrl: ad.trackingUrlTemplate || '',
+                            });
+                        }
+                    }
+                }
+
+                liveGoogleCache[custId] = { campaigns, adGroups, ads, currency };
+            } catch (e) {
+                console.error(`Google Ads API Error for customer ${custId}:`, e);
+                liveGoogleCache[custId] = { campaigns: [], adGroups: [], ads: [], currency: 'KRW' };
             }
         }
     }
@@ -296,6 +419,125 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
             if (!row.UTMParameters) {
                 errors.push('UTM 파라미터가 누락되었습니다.');
                 if (status === 'PASS') status = 'WARNING';
+            }
+
+        } else if (status !== 'FAIL' && googleAccessToken && row.Platform.toUpperCase().includes('GOOGLE')) {
+            // ─── Google Ads Live Crosscheck ───
+            const custId = row.AccountID.replace(/-/g, '');
+            const cache = liveGoogleCache[custId];
+
+            if (!cache) {
+                errors.push('Google Ads 계정 데이터를 불러오지 못했습니다.');
+                status = 'FAIL';
+            } else {
+                const normalizeStr = (s: string) => String(s || '').replace(/\s+/g, '').toLowerCase();
+                const normalizeDate = (d: string) => d ? d.substring(0, 10).replace(/[^0-9-]/g, '') : '';
+                const normalizeUrl = (url: string) => {
+                    if (!url) return '';
+                    try {
+                        const u = new URL(url);
+                        return (u.origin + u.pathname).replace(/\/$/, '').toLowerCase();
+                    } catch { return url.split('?')[0].replace(/\/$/, '').toLowerCase(); }
+                };
+
+                // 1. Find campaign (by ID if provided, else by name)
+                const liveCampaign = row.CampaignID
+                    ? cache.campaigns.find((c: any) => String(c.id) === String(row.CampaignID).trim())
+                    : cache.campaigns.find((c: any) => normalizeStr(c.name) === normalizeStr(row.CampaignName));
+
+                if (!liveCampaign) {
+                    errors.push(`매체에 일치하는 캠페인이 없음 (${row.CampaignID || row.CampaignName})`);
+                    status = 'FAIL';
+                } else {
+                    // 2. Currency
+                    if (row.Currency) {
+                        const liveCurrency = (cache.currency || 'KRW').toUpperCase();
+                        if (row.Currency.toUpperCase().trim() !== liveCurrency) {
+                            errors.push(`통화 불일치 (기획안: ${row.Currency}, 매체: ${liveCurrency})`);
+                            status = 'FAIL';
+                        }
+                    }
+
+                    // 3. Budget (Google uses micros → divide by 1,000,000)
+                    const excelCampDaily = Number(String(row.CampaignDailyBudget || '').replace(/[^0-9.]/g, '')) || 0;
+                    const excelCampLifetime = Number(String(row.CampaignLifetimeBudget || '').replace(/[^0-9.]/g, '')) || 0;
+                    const excelBudget = excelCampDaily || excelCampLifetime || 0;
+                    const liveBudget = liveCampaign.dailyBudget || liveCampaign.lifetimeBudget || 0;
+                    if (excelBudget > 0 && liveBudget > 0 && Math.abs(liveBudget - excelBudget) > excelBudget * 0.1) {
+                        errors.push(`캠페인 예산 불일치 (기획안: ${excelBudget.toLocaleString()}, 매체: ${liveBudget.toLocaleString()})`);
+                        status = 'FAIL';
+                    }
+
+                    // 4. Dates
+                    if (row.StartDate && liveCampaign.startDate) {
+                        const excelStart = normalizeDate(row.StartDate);
+                        const liveStart = normalizeDate(liveCampaign.startDate);
+                        if (excelStart && liveStart && excelStart !== liveStart) {
+                            errors.push(`시작일 불일치 (기획안: ${excelStart}, 매체: ${liveStart})`);
+                            status = 'FAIL';
+                        }
+                    }
+                    if (row.EndDate && liveCampaign.endDate) {
+                        const excelEnd = normalizeDate(row.EndDate);
+                        const liveEnd = normalizeDate(liveCampaign.endDate);
+                        if (excelEnd && liveEnd && excelEnd !== liveEnd) {
+                            errors.push(`종료일 불일치 (기획안: ${excelEnd}, 매체: ${liveEnd})`);
+                            status = 'FAIL';
+                        }
+                    }
+
+                    // 5. Campaign objective (channel type)
+                    if (row.CampaignObjective && liveCampaign.channelType) {
+                        if (normalizeStr(liveCampaign.channelType) !== normalizeStr(row.CampaignObjective)) {
+                            errors.push(`캠페인 목적(채널) 불일치 (기획안: ${row.CampaignObjective}, 매체: ${liveCampaign.channelType})`);
+                            status = 'FAIL';
+                        }
+                    }
+
+                    // 6. Ad group name
+                    const liveAdGroup = cache.adGroups.find((ag: any) =>
+                        ag.campaignId === liveCampaign.id &&
+                        normalizeStr(ag.name) === normalizeStr(row.AdSetName)
+                    );
+                    if (row.AdSetName && !liveAdGroup) {
+                        errors.push(`매체에 일치하는 광고 그룹이 없음 (${row.AdSetName})`);
+                        status = 'FAIL';
+                    }
+
+                    // 7. Ad name + landing URL + UTM
+                    if (row.AdName && liveAdGroup) {
+                        const liveAd = cache.ads.find((a: any) =>
+                            a.adGroupId === liveAdGroup.id &&
+                            normalizeStr(a.name) === normalizeStr(row.AdName)
+                        );
+                        if (!liveAd) {
+                            errors.push(`매체에 일치하는 광고가 없음 (${row.AdName})`);
+                            status = 'FAIL';
+                        } else {
+                            // Landing URL
+                            const liveLandingUrl = liveAd.finalUrls?.[0] || '';
+                            if (row.LandingURL) {
+                                if (!liveLandingUrl) {
+                                    errors.push('매체에 랜딩 URL이 세팅되지 않음');
+                                    if (status === 'PASS') status = 'WARNING';
+                                } else if (normalizeUrl(liveLandingUrl) !== normalizeUrl(row.LandingURL)) {
+                                    errors.push(`랜딩 URL 불일치 (매체: ${liveLandingUrl})`);
+                                    status = 'FAIL';
+                                }
+                            }
+                            // UTM (trackingUrlTemplate)
+                            if (row.UTMParameters) {
+                                if (!liveAd.trackingUrl) {
+                                    errors.push('매체에 UTM 파라미터(Tracking Template)가 비어있음');
+                                    status = 'FAIL';
+                                } else if (!liveAd.trackingUrl.includes(row.UTMParameters) && liveAd.trackingUrl !== row.UTMParameters) {
+                                    errors.push(`UTM 파라미터 불일치 (매체: ${liveAd.trackingUrl})`);
+                                    status = 'FAIL';
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 
