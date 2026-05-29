@@ -46,7 +46,7 @@ META_OPT_GOAL_MAP = {
 META_BILLING_MAP = {
     'IMPRESSIONS':     ('노출당 과금(CPM)',   '1,000회 노출당 비용 기준 과금'),
     'LINK_CLICKS':     ('클릭당 과금(CPC)',   '링크 클릭 1회당 비용 기준 과금'),
-    'THRUPLAY':        ('ThruPlay당 과금',   '동영상 완주(15초↑) 1회당 과금'),
+    'THRUPLAY':        ('ThruPlay당 과금',   '동영상 완주(15초 이상) 1회당 과금'),
     'POST_ENGAGEMENT': ('참여당 과금',        '게시물 참여 1회당 과금'),
     'APP_INSTALLS':    ('앱 설치당 과금',     '앱 설치 1건당 비용 기준 과금'),
     'NONE':            ('없음',              '별도 과금 기준 없음(자동 최적화)'),
@@ -81,17 +81,17 @@ GOOGLE_BIDDING_MAP = {
     'UNSPECIFIED':               ('미지정',              '입찰 전략 미지정'),
 }
 GOOGLE_AG_TYPE_MAP = {
-    'SEARCH_STANDARD':              ('검색_표준',          '일반 키워드 기반 검색 광고 그룹'),
-    'DISPLAY_STANDARD':             ('디스플레이_표준',     '이미지/배너 디스플레이 광고 그룹'),
-    'SHOPPING_PRODUCT_ADS':         ('쇼핑_제품',          '쇼핑 제품 목록 광고 그룹'),
-    'VIDEO_TRUE_VIEW_IN_STREAM':    ('동영상_인스트림',     'YouTube 인스트림(건너뜀 가능)'),
-    'VIDEO_BUMPER':                 ('동영상_범퍼',         '6초 범퍼 광고 그룹'),
-    'VIDEO_NON_SKIPPABLE_IN_STREAM':('동영상_논스킵',       '건너뛸 수 없는 인스트림 광고'),
-    'VIDEO_RESPONSIVE':             ('동영상_반응형',       '반응형 동영상 광고 그룹'),
-    'APP_CAMPAIGN':                 ('앱_캠페인',           '앱 설치/참여 유도 광고 그룹'),
-    'SMART_CAMPAIGN_ADS':           ('스마트_캠페인',       '스마트 캠페인 광고 그룹'),
-    'UNKNOWN':                      ('알 수 없음',          '분류되지 않은 광고 그룹 유형'),
-    'UNSPECIFIED':                  ('미지정',              '광고 그룹 유형 미지정'),
+    'SEARCH_STANDARD':               ('검색_표준',          '일반 키워드 기반 검색 광고 그룹'),
+    'DISPLAY_STANDARD':              ('디스플레이_표준',     '이미지/배너 디스플레이 광고 그룹'),
+    'SHOPPING_PRODUCT_ADS':          ('쇼핑_제품',          '쇼핑 제품 목록 광고 그룹'),
+    'VIDEO_TRUE_VIEW_IN_STREAM':     ('동영상_인스트림',     'YouTube 인스트림(건너뜀 가능)'),
+    'VIDEO_BUMPER':                  ('동영상_범퍼',         '6초 범퍼 광고 그룹'),
+    'VIDEO_NON_SKIPPABLE_IN_STREAM': ('동영상_논스킵',       '건너뛸 수 없는 인스트림 광고'),
+    'VIDEO_RESPONSIVE':              ('동영상_반응형',       '반응형 동영상 광고 그룹'),
+    'APP_CAMPAIGN':                  ('앱_캠페인',           '앱 설치/참여 유도 광고 그룹'),
+    'SMART_CAMPAIGN_ADS':            ('스마트_캠페인',       '스마트 캠페인 광고 그룹'),
+    'UNKNOWN':                       ('알 수 없음',          '분류되지 않은 광고 그룹 유형'),
+    'UNSPECIFIED':                   ('미지정',              '광고 그룹 유형 미지정'),
 }
 
 
@@ -99,64 +99,84 @@ def make_record(platform, field_type, api_value, kr_name, description):
     return {'platform': platform, 'field_type': field_type,
             'api_value': api_value, 'kr_name': kr_name, 'description': description}
 
+
 records_to_insert = []
 
 # ════════════════════════════════════════════════════════════
 # PART 1: Meta
 # ════════════════════════════════════════════════════════════
 print("\n[PART 1] Meta 데이터 수집")
+
+# 1-A. 정적 매핑 전체를 항상 먼저 삽입 (공식 API 문서 기준 전체 enum)
+for v, (kr, d) in META_OBJECTIVE_MAP.items():   records_to_insert.append(make_record('META', 'objective', v, kr, d))
+for v, (kr, d) in META_BUYING_TYPE_MAP.items():  records_to_insert.append(make_record('META', 'buying_type', v, kr, d))
+for v, (kr, d) in META_OPT_GOAL_MAP.items():    records_to_insert.append(make_record('META', 'optimization_goal', v, kr, d))
+for v, (kr, d) in META_BILLING_MAP.items():     records_to_insert.append(make_record('META', 'billing_event', v, kr, d))
+print(f"  정적 매핑 삽입 완료: {len(records_to_insert)}개")
+
+# 1-B. 라이브 스캔으로 정적 매핑에 없는 미지(未知) 값만 추가 보완
 if META_TOKEN:
+    print("  라이브 계정 스캔으로 미지 값 보완 중...")
     acc_res = requests.get(
         "https://graph.facebook.com/v19.0/me/adaccounts?fields=account_id&limit=200",
         params={'access_token': META_TOKEN}, verify=False
     )
     accounts = acc_res.json().get('data', [])
-    meta_seen = {k: set() for k in ['objective','buying_type','optimization_goal','billing_event']}
-
+    known_meta = {
+        'objective':         set(META_OBJECTIVE_MAP.keys()),
+        'buying_type':       set(META_BUYING_TYPE_MAP.keys()),
+        'optimization_goal': set(META_OPT_GOAL_MAP.keys()),
+        'billing_event':     set(META_BILLING_MAP.keys()),
+    }
+    new_count = 0
     for acc in accounts[:10]:
-        act_id = str(acc.get('account_id') or acc.get('id','')).replace('act_','')
-        print(f"  계정 {act_id} 조회 중...")
+        act_id = str(acc.get('account_id') or acc.get('id', '')).replace('act_', '')
         try:
             c_res = requests.get(
                 f"https://graph.facebook.com/v19.0/act_{act_id}/campaigns",
-                params={'fields':'objective,buying_type','limit':200,'access_token':META_TOKEN}, verify=False
+                params={'fields': 'objective,buying_type', 'limit': 200, 'access_token': META_TOKEN}, verify=False
             )
-            for c in c_res.json().get('data',[]):
-                if c.get('objective'):   meta_seen['objective'].add(c['objective'])
-                if c.get('buying_type'): meta_seen['buying_type'].add(c['buying_type'])
+            for c in c_res.json().get('data', []):
+                for ftype, val in [('objective', c.get('objective')), ('buying_type', c.get('buying_type'))]:
+                    if val and val not in known_meta[ftype]:
+                        records_to_insert.append(make_record('META', ftype, val, val, '(라이브 계정에서 발견된 미분류 값)'))
+                        known_meta[ftype].add(val); new_count += 1
+
             s_res = requests.get(
                 f"https://graph.facebook.com/v19.0/act_{act_id}/adsets",
-                params={'fields':'optimization_goal,billing_event','limit':200,'access_token':META_TOKEN}, verify=False
+                params={'fields': 'optimization_goal,billing_event', 'limit': 200, 'access_token': META_TOKEN}, verify=False
             )
-            for s in s_res.json().get('data',[]):
-                if s.get('optimization_goal'): meta_seen['optimization_goal'].add(s['optimization_goal'])
-                if s.get('billing_event'):     meta_seen['billing_event'].add(s['billing_event'])
+            for s in s_res.json().get('data', []):
+                for ftype, val in [('optimization_goal', s.get('optimization_goal')), ('billing_event', s.get('billing_event'))]:
+                    if val and val not in known_meta[ftype]:
+                        records_to_insert.append(make_record('META', ftype, val, val, '(라이브 계정에서 발견된 미분류 값)'))
+                        known_meta[ftype].add(val); new_count += 1
         except Exception as e:
             print(f"    오류: {e}")
-
-    for v in meta_seen['objective']:
-        kr,d = META_OBJECTIVE_MAP.get(v,(v,'(설명 없음)')); records_to_insert.append(make_record('META','objective',v,kr,d))
-    for v in meta_seen['buying_type']:
-        kr,d = META_BUYING_TYPE_MAP.get(v,(v,'(설명 없음)')); records_to_insert.append(make_record('META','buying_type',v,kr,d))
-    for v in meta_seen['optimization_goal']:
-        kr,d = META_OPT_GOAL_MAP.get(v,(v,'(설명 없음)')); records_to_insert.append(make_record('META','optimization_goal',v,kr,d))
-    for v in meta_seen['billing_event']:
-        kr,d = META_BILLING_MAP.get(v,(v,'(설명 없음)')); records_to_insert.append(make_record('META','billing_event',v,kr,d))
+    print(f"  라이브 스캔 보완: {new_count}개 추가")
 else:
-    print("  토큰 없음 → 정적 매핑 사용")
-    for v,(kr,d) in META_OBJECTIVE_MAP.items():   records_to_insert.append(make_record('META','objective',v,kr,d))
-    for v,(kr,d) in META_BUYING_TYPE_MAP.items():  records_to_insert.append(make_record('META','buying_type',v,kr,d))
-    for v,(kr,d) in META_OPT_GOAL_MAP.items():    records_to_insert.append(make_record('META','optimization_goal',v,kr,d))
-    for v,(kr,d) in META_BILLING_MAP.items():     records_to_insert.append(make_record('META','billing_event',v,kr,d))
-print(f"  Meta 수집 완료: {len(records_to_insert)}개")
+    print("  토큰 없음 → 라이브 스캔 생략 (정적 매핑만 사용)")
+
+print(f"  Meta 최종: {len(records_to_insert)}개")
 
 # ════════════════════════════════════════════════════════════
 # PART 2: Google Ads
 # ════════════════════════════════════════════════════════════
 print("\n[PART 2] Google Ads 데이터 수집")
+
+# 2-A. 정적 매핑 전체를 항상 먼저 삽입
+google_start = len(records_to_insert)
+for v, (kr, d) in GOOGLE_CHANNEL_MAP.items():  records_to_insert.append(make_record('GOOGLE_ADS', 'objective', v, kr, d))
+for v, (kr, d) in GOOGLE_BIDDING_MAP.items():  records_to_insert.append(make_record('GOOGLE_ADS', 'buying_type', v, kr, d))
+for v, (kr, d) in GOOGLE_AG_TYPE_MAP.items():  records_to_insert.append(make_record('GOOGLE_ADS', 'optimization_goal', v, kr, d))
+records_to_insert.append(make_record('GOOGLE_ADS', 'billing_event', 'N/A', '해당 없음',
+    'Google Ads는 과금 기준 개념이 없습니다. 입찰 전략(buying_type)으로 과금 방식이 결정됩니다.'))
+print(f"  정적 매핑 삽입 완료: {len(records_to_insert) - google_start}개")
+
+# 2-B. Supabase에서 Google Ads 설정 로드
 g_res = requests.get(
     f"{SUPABASE_URL}/rest/v1/platform_settings?platform=eq.GOOGLE_ADS",
-    headers={"apikey":SUPABASE_KEY,"Authorization":f"Bearer {SUPABASE_KEY}"}, verify=False
+    headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}, verify=False
 )
 gs_list = g_res.json()
 google_access_token = None
@@ -164,63 +184,71 @@ google_access_token = None
 if gs_list:
     gs = gs_list[0]
     tr = requests.post('https://oauth2.googleapis.com/token', data={
-        'client_id':gs.get('app_id','').strip(), 'client_secret':gs.get('app_secret','').strip(),
-        'refresh_token':gs.get('refresh_token','').strip(), 'grant_type':'refresh_token'
+        'client_id':     gs.get('app_id', '').strip(),
+        'client_secret': gs.get('app_secret', '').strip(),
+        'refresh_token': gs.get('refresh_token', '').strip(),
+        'grant_type':    'refresh_token'
     })
-    td = tr.json(); google_access_token = td.get('access_token')
-    developer_token = gs.get('access_token','').strip()
-    mcc_id = gs.get('business_id','').strip().replace('-','')
+    td = tr.json()
+    google_access_token = td.get('access_token')
+    developer_token = gs.get('access_token', '').strip()
+    mcc_id = gs.get('business_id', '').strip().replace('-', '')
     print(f"  Access Token {'획득 성공' if google_access_token else '획득 실패'}")
 
-google_start = len(records_to_insert)
+# 2-C. 라이브 스캔으로 정적 매핑에 없는 미지 값만 추가 보완
 if google_access_token:
+    print("  라이브 계정 스캔으로 미지 값 보완 중...")
     g_headers = {
-        'Authorization':f'Bearer {google_access_token}','developer-token':developer_token,
-        'Content-Type':'application/json','login-customer-id':mcc_id,
+        'Authorization':    f'Bearer {google_access_token}',
+        'developer-token':  developer_token,
+        'Content-Type':     'application/json',
+        'login-customer-id': mcc_id,
     }
-    # MCC 하위 계정 최대 10개 샘플링
     cust_q = "SELECT customer_client.id FROM customer_client WHERE customer_client.status = 'ENABLED' AND customer_client.level > 0 LIMIT 10"
-    cr = requests.post(f"https://googleads.googleapis.com/v22/customers/{mcc_id}/googleAds:searchStream",
-                       headers=g_headers, json={'query':cust_q}, verify=False)
+    cr = requests.post(
+        f"https://googleads.googleapis.com/v22/customers/{mcc_id}/googleAds:searchStream",
+        headers=g_headers, json={'query': cust_q}, verify=False
+    )
     cids = []
     if isinstance(cr.json(), list):
         for chunk in cr.json():
-            for row in chunk.get('results',[]):
-                cid = row.get('customerClient',{}).get('id')
+            for row in chunk.get('results', []):
+                cid = row.get('customerClient', {}).get('id')
                 if cid: cids.append(str(cid))
 
-    g_seen = {k:set() for k in ['objective','buying_type','optimization_goal']}
+    known_google = {
+        'objective':         set(GOOGLE_CHANNEL_MAP.keys()),
+        'buying_type':       set(GOOGLE_BIDDING_MAP.keys()),
+        'optimization_goal': set(GOOGLE_AG_TYPE_MAP.keys()),
+    }
+    new_count = 0
     for cid in cids[:10]:
-        print(f"  계정 {cid} 조회 중...")
         try:
             q = """SELECT campaign.advertising_channel_type, campaign.bidding_strategy_type, ad_group.type
                    FROM ad_group WHERE campaign.status='ENABLED' AND ad_group.status='ENABLED' LIMIT 500"""
-            r = requests.post(f"https://googleads.googleapis.com/v22/customers/{cid}/googleAds:searchStream",
-                              headers=g_headers, json={'query':q}, verify=False)
+            r = requests.post(
+                f"https://googleads.googleapis.com/v22/customers/{cid}/googleAds:searchStream",
+                headers=g_headers, json={'query': q}, verify=False
+            )
             if isinstance(r.json(), list):
                 for chunk in r.json():
-                    for row in chunk.get('results',[]):
-                        camp=row.get('campaign',{}); ag=row.get('adGroup',{})
-                        if camp.get('advertisingChannelType'): g_seen['objective'].add(camp['advertisingChannelType'])
-                        if camp.get('biddingStrategyType'):    g_seen['buying_type'].add(camp['biddingStrategyType'])
-                        if ag.get('type'):                     g_seen['optimization_goal'].add(ag['type'])
+                    for row in chunk.get('results', []):
+                        camp = row.get('campaign', {}); ag = row.get('adGroup', {})
+                        for ftype, val in [
+                            ('objective',         camp.get('advertisingChannelType')),
+                            ('buying_type',       camp.get('biddingStrategyType')),
+                            ('optimization_goal', ag.get('type')),
+                        ]:
+                            if val and val not in known_google[ftype]:
+                                records_to_insert.append(make_record('GOOGLE_ADS', ftype, val, val, '(라이브 계정에서 발견된 미분류 값)'))
+                                known_google[ftype].add(val); new_count += 1
         except Exception as e:
             print(f"    오류: {e}")
-
-    for v in g_seen['objective']:
-        kr,d=GOOGLE_CHANNEL_MAP.get(v,(v,'(설명 없음)')); records_to_insert.append(make_record('GOOGLE_ADS','objective',v,kr,d))
-    for v in g_seen['buying_type']:
-        kr,d=GOOGLE_BIDDING_MAP.get(v,(v,'(설명 없음)')); records_to_insert.append(make_record('GOOGLE_ADS','buying_type',v,kr,d))
-    for v in g_seen['optimization_goal']:
-        kr,d=GOOGLE_AG_TYPE_MAP.get(v,(v,'(설명 없음)')); records_to_insert.append(make_record('GOOGLE_ADS','optimization_goal',v,kr,d))
-    records_to_insert.append(make_record('GOOGLE_ADS','billing_event','N/A','해당 없음','Google Ads는 과금 기준을 별도로 설정하지 않습니다. 입찰 전략(buying_type)으로 결정됩니다.'))
+    print(f"  라이브 스캔 보완: {new_count}개 추가")
 else:
-    print("  토큰 없음 → 정적 매핑 사용")
-    for v,(kr,d) in GOOGLE_CHANNEL_MAP.items():  records_to_insert.append(make_record('GOOGLE_ADS','objective',v,kr,d))
-    for v,(kr,d) in GOOGLE_BIDDING_MAP.items():  records_to_insert.append(make_record('GOOGLE_ADS','buying_type',v,kr,d))
-    for v,(kr,d) in GOOGLE_AG_TYPE_MAP.items():  records_to_insert.append(make_record('GOOGLE_ADS','optimization_goal',v,kr,d))
-    records_to_insert.append(make_record('GOOGLE_ADS','billing_event','N/A','해당 없음','Google Ads는 과금 기준 개념이 없습니다.'))
-print(f"  Google Ads 수집 완료: {len(records_to_insert)-google_start}개")
+    print("  토큰 없음 → 라이브 스캔 생략 (정적 매핑만 사용)")
+
+print(f"  Google Ads 최종: {len(records_to_insert) - google_start}개")
 
 # ════════════════════════════════════════════════════════════
 # PART 3: 중복 제거 후 Supabase upsert
@@ -228,22 +256,24 @@ print(f"  Google Ads 수집 완료: {len(records_to_insert)-google_start}개")
 print("\n[PART 3] Supabase 저장")
 seen_keys, unique_records = set(), []
 for r in records_to_insert:
-    k = (r['platform'],r['field_type'],r['api_value'])
+    k = (r['platform'], r['field_type'], r['api_value'])
     if k not in seen_keys:
         seen_keys.add(k); unique_records.append(r)
 
 print(f"  고유 레코드: {len(unique_records)}개")
 rest_url = f"{SUPABASE_URL}/rest/v1/ad_enum_values"
-headers = {
-    "apikey":SUPABASE_KEY,"Authorization":f"Bearer {SUPABASE_KEY}",
-    "Content-Type":"application/json","Prefer":"resolution=merge-duplicates",
+db_headers = {
+    "apikey":        SUPABASE_KEY,
+    "Authorization": f"Bearer {SUPABASE_KEY}",
+    "Content-Type":  "application/json",
+    "Prefer":        "resolution=merge-duplicates",
 }
 has_error = False
 for i in range(0, len(unique_records), 50):
-    chunk = unique_records[i:i+50]
-    res = requests.post(rest_url, headers=headers, json=chunk, verify=False)
+    chunk = unique_records[i:i + 50]
+    res = requests.post(rest_url, headers=db_headers, json=chunk, verify=False)
     if res.status_code >= 400:
-        print(f"! DB Error (chunk {i//50+1}):", res.text); has_error = True
+        print(f"! DB Error (chunk {i // 50 + 1}):", res.text); has_error = True
 
 if not has_error:
     print(f"[Success] 'ad_enum_values' 테이블에 {len(unique_records)}개 저장 완료!")
