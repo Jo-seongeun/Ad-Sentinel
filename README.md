@@ -39,37 +39,23 @@ SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 META_ACCESS_TOKEN=your_meta_token_for_local_testing
 ```
 
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+## 🗄 데이터베이스 스키마 (Core Data Structure)
+Ad-Sentinel은 Supabase (PostgreSQL) 기반으로 구축되어 있으며, 주요 테이블은 다음과 같습니다. 해당 구조는 코어 비즈니스 로직과 강하게 결합되어 있으므로 임의 수정 시 주의가 필요합니다.
 
-First, run the development server:
+1. **`users`**: 사용자 계정 정보 (`auth.users`와 1:1 매핑) 및 팀 소속(`team_id`), 권한(`role: SUPER_ADMIN, ADMIN, MEMBER`) 관리
+2. **`teams`**: 대행사 또는 부서 단위의 팀 그룹
+3. **`team_account_map`**: 팀과 실제 매체(Meta/Google) 광고 계정(`ad_account_id`)을 매핑하는 N:M 연결 테이블
+4. **`platform_settings`**: 팀별 또는 전역 매체 API 연동 정보 보관 (App ID, Secret, Refresh Token 등)
+5. **`planned_campaigns` / `live_campaign_settings`**: 기획안(Excel) 데이터와 실제 매체(Live) 데이터 캐싱 및 이력 보관용
+6. **`audit_logs`**: 실시간 검수 결과 오류/경고 발생 내역 및 해결(Resolved) 상태 추적
+7. **`ad_enum_values`**: 각 매체(Meta, Google)의 캠페인 목적, 입찰 전략 등 열거형(Enum) 값과 한글 명칭, 설명이 매핑된 참조(Reference) 테이블
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## 🏗 핵심 아키텍처 규칙 (Architecture Guidelines)
+- **RLS (Row Level Security)**: Supabase RLS가 전면 적용되어 있습니다. 클라이언트 및 API Route(서버 액션)에서 일반 `supabase` 클라이언트를 사용할 경우 로그인한 유저의 소속 팀(`team_id`) 데이터만 조회/수정 가능합니다.
+- **Service Role Bypass**: `teams` 생성이나 `team_account_map` 할당과 같이 RLS `INSERT/DELETE` 권한이 제한된 작업은 서버 액션(`use server`) 내에서 권한(`SUPER_ADMIN/ADMIN`) 검증 후, 별도의 `adminClient`(Service Role Key 사용)를 통해 처리합니다.
+- **매체 연동 로직 (`actions.ts`)**: Meta Graph API 및 Google Ads API 통신은 보안상 철저하게 서버 환경(Server Actions)에서만 수행되며, Client-side에서는 호출 결과만 받아 UI를 렌더링합니다.
+- **캐싱 및 상태**: React `useTransition`을 활용하여 UI Optimistic Updates와 서버 동기화를 매끄럽게 처리합니다.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+*본 레포지토리는 Vercel을 통해 자동 배포 환경이 구축되어 있습니다.*
