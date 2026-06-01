@@ -184,98 +184,103 @@ export default function AccountMappingClientUI({ initialAccounts, teams }: Props
                 <div className="text-[11px] font-medium text-zinc-500 text-center">{selectedLeftAccounts.size}개<br />매핑</div>
             </div>
 
-            {/* MIDDLE COLUMN: Team List */}
-            <div className="w-[25%] flex flex-col bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden shadow-sm">
-                <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/20">
-                    <h3 className="font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                        팀 리스트
-                        <span className="bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 py-0.5 px-2 rounded-full text-xs">{teams.length}</span>
-                    </h3>
-                </div>
-                <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                    {teams.map(team => {
-                        const isSelected = selectedTeam === team.id;
-                        const teamAccountsCount = accounts.filter(a => a.assignedTeamId === team.id).length;
+            {/* RIGHT SIDE: Team List (top) + Mapped Accounts (bottom) — stacked vertically */}
+            <div className="flex-1 flex flex-col gap-4 min-h-0">
 
-                        return (
-                            <div
-                                key={team.id}
-                                onClick={() => { setSelectedTeam(team.id); setSelectedRightAccounts(new Set()); }}
-                                className={`p-4 rounded-xl border-2 transition-all cursor-pointer ${isSelected ? 'border-indigo-600 bg-indigo-50/50 dark:bg-indigo-500/10' : 'border-zinc-200 dark:border-zinc-700 hover:border-indigo-300 hover:shadow-sm'}`}
-                            >
-                                <div className="flex justify-between items-center mb-1">
-                                    <h4 className={`font-semibold ${isSelected ? 'text-indigo-700 dark:text-indigo-400' : 'text-zinc-900 dark:text-zinc-100'}`}>{team.name}</h4>
-                                    {isSelected && <ArrowRight className="w-5 h-5 text-indigo-600" />}
-                                </div>
-                                <div className="text-sm font-medium text-zinc-600 dark:text-zinc-400 flex items-center gap-1.5">
-                                    <Cable className="w-4 h-4" /> 연결된 광고 계정: {teamAccountsCount}개
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-            </div>
-
-            {/* RIGHT COLUMN: Team's Accounts (Mapped) */}
-            <div className="flex-1 flex flex-col bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden shadow-sm">
-                {!selectedTeam ? (
-                    <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-zinc-500">
-                        <FolderGit2 className="w-12 h-12 text-zinc-300 dark:text-zinc-700 mb-4" />
-                        <p className="font-medium text-zinc-900 dark:text-zinc-100 mb-2">DB에 등록된 실제 팀입니다.</p>
-                        <p className="text-sm">가운데 팀 리스트에서 특정 팀을 선택하면<br />해당 팀에 성공적으로 매핑된 계정 목록 창이 활성화됩니다.</p>
+                {/* TOP: Team List */}
+                <div className="flex flex-col bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden shadow-sm">
+                    <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/20">
+                        <h3 className="font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                            팀 리스트
+                            <span className="bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 py-0.5 px-2 rounded-full text-xs">{teams.length}</span>
+                        </h3>
                     </div>
-                ) : (
-                    <>
-                        <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 bg-indigo-50/50 dark:bg-indigo-900/10 flex flex-col gap-3">
-                            <div className="flex items-center justify-between">
-                                <h3 className="font-semibold text-indigo-900 dark:text-indigo-100 flex items-center gap-2">
-                                    <span className="text-indigo-600 dark:text-indigo-400">{teams.find(t => t.id === selectedTeam)?.name}</span> 연결된 계정
-                                    <span className="bg-indigo-100 dark:bg-indigo-800 text-indigo-700 dark:text-indigo-300 py-0.5 px-2 rounded-full text-xs font-bold">{rightFilteredAccounts.length}</span>
-                                </h3>
-                                <div className="flex gap-2 text-xs">
-                                    <button onClick={selectAllRight} className="text-indigo-600 hover:text-indigo-700 font-medium">전체선택</button>
-                                    <span className="text-zinc-300">|</span>
-                                    <button onClick={deselectAllRight} className="text-zinc-500 hover:text-zinc-700 font-medium">선택해제</button>
-                                </div>
-                            </div>
-                            <div className="flex gap-2">
-                                <div className="relative flex-1">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
-                                    <input type="text" placeholder="검색..." value={rightSearchQuery} onChange={e => setRightSearchQuery(e.target.value)} className="w-full pl-9 pr-3 py-2 text-sm bg-white dark:bg-zinc-800 border focus:border-indigo-500 border-zinc-200 dark:border-zinc-700 rounded-lg outline-none transition-colors" />
-                                </div>
-                                <button
-                                    onClick={handleUnassign}
-                                    disabled={selectedRightAccounts.size === 0 || isPending}
-                                    className="px-3 py-2 bg-white dark:bg-zinc-800 border border-rose-200 dark:border-rose-800/50 text-rose-600 dark:text-rose-400 rounded-lg text-sm font-medium hover:bg-rose-50 dark:hover:bg-rose-900/20 disabled:opacity-50 transition-colors flex items-center gap-1.5 whitespace-nowrap"
+                    <div className="overflow-y-auto max-h-[260px] p-3 grid grid-cols-2 gap-2">
+                        {teams.map(team => {
+                            const isSelected = selectedTeam === team.id;
+                            const teamAccountsCount = accounts.filter(a => a.assignedTeamId === team.id).length;
+
+                            return (
+                                <div
+                                    key={team.id}
+                                    onClick={() => { setSelectedTeam(team.id); setSelectedRightAccounts(new Set()); }}
+                                    className={`p-3 rounded-xl border-2 transition-all cursor-pointer ${isSelected ? 'border-indigo-600 bg-indigo-50/50 dark:bg-indigo-500/10' : 'border-zinc-200 dark:border-zinc-700 hover:border-indigo-300 hover:shadow-sm'}`}
                                 >
-                                    <Unplug className="w-4 h-4" /> 연결 해제 ({selectedRightAccounts.size})
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                            {rightFilteredAccounts.map(acc => {
-                                const isSelected = selectedRightAccounts.has(acc.id);
-
-                                return (
-                                    <div key={acc.id} onClick={() => toggleRightAccount(acc.id)} className={`flex items-start gap-3 p-3 rounded-lg cursor-pointer transition-colors border ${isSelected ? 'bg-rose-50 border-rose-200 dark:bg-rose-500/10 dark:border-rose-500/30' : 'border-transparent hover:bg-zinc-50 dark:hover:bg-zinc-800/50'}`}>
-                                        <div className="mt-0.5">
-                                            <div className={`w-4 h-4 rounded border flex items-center justify-center ${isSelected ? 'bg-rose-600 border-rose-600 text-white' : 'border-zinc-300 dark:border-zinc-600'}`}>{isSelected && <Check className="w-3 h-3" />}</div>
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate flex items-center gap-2">
-                                                {acc.name}
-                                                {acc.platform === 'META' ? <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded capitalize">Meta</span> : <span className="text-[10px] font-bold bg-green-100 text-green-700 px-1.5 py-0.5 rounded capitalize">Google</span>}
-                                            </p>
-                                            <p className="text-[11px] font-mono text-zinc-500 mt-1">ID: {acc.id}</p>
-                                        </div>
+                                    <div className="flex justify-between items-center mb-1">
+                                        <h4 className={`font-semibold text-sm truncate ${isSelected ? 'text-indigo-700 dark:text-indigo-400' : 'text-zinc-900 dark:text-zinc-100'}`}>{team.name}</h4>
+                                        {isSelected && <ArrowRight className="w-4 h-4 text-indigo-600 shrink-0" />}
                                     </div>
-                                );
-                            })}
-                            {rightFilteredAccounts.length === 0 && <div className="text-center py-8 text-sm text-zinc-500">현재 이 팀에 할당된 계정이 없습니다.</div>}
+                                    <div className="text-xs font-medium text-zinc-600 dark:text-zinc-400 flex items-center gap-1">
+                                        <Cable className="w-3 h-3" /> 연결된 광고 계정: {teamAccountsCount}개
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* BOTTOM: Mapped Accounts for selected team */}
+                <div className="flex-1 flex flex-col bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden shadow-sm min-h-0">
+                    {!selectedTeam ? (
+                        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-zinc-500">
+                            <FolderGit2 className="w-12 h-12 text-zinc-300 dark:text-zinc-700 mb-4" />
+                            <p className="font-medium text-zinc-900 dark:text-zinc-100 mb-2">DB에 등록된 실제 팀입니다.</p>
+                            <p className="text-sm">위 팀 리스트에서 특정 팀을 선택하면<br />해당 팀에 성공적으로 매핑된 계정 목록이 활성화됩니다.</p>
                         </div>
-                    </>
-                )}
+                    ) : (
+                        <>
+                            <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 bg-indigo-50/50 dark:bg-indigo-900/10 flex flex-col gap-3 shrink-0">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="font-semibold text-indigo-900 dark:text-indigo-100 flex items-center gap-2">
+                                        <span className="text-indigo-600 dark:text-indigo-400">{teams.find(t => t.id === selectedTeam)?.name}</span> 연결된 계정
+                                        <span className="bg-indigo-100 dark:bg-indigo-800 text-indigo-700 dark:text-indigo-300 py-0.5 px-2 rounded-full text-xs font-bold">{rightFilteredAccounts.length}</span>
+                                    </h3>
+                                    <div className="flex gap-2 text-xs">
+                                        <button onClick={selectAllRight} className="text-indigo-600 hover:text-indigo-700 font-medium">전체선택</button>
+                                        <span className="text-zinc-300">|</span>
+                                        <button onClick={deselectAllRight} className="text-zinc-500 hover:text-zinc-700 font-medium">선택해제</button>
+                                    </div>
+                                </div>
+                                <div className="flex gap-2">
+                                    <div className="relative flex-1">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+                                        <input type="text" placeholder="검색..." value={rightSearchQuery} onChange={e => setRightSearchQuery(e.target.value)} className="w-full pl-9 pr-3 py-2 text-sm bg-white dark:bg-zinc-800 border focus:border-indigo-500 border-zinc-200 dark:border-zinc-700 rounded-lg outline-none transition-colors" />
+                                    </div>
+                                    <button
+                                        onClick={handleUnassign}
+                                        disabled={selectedRightAccounts.size === 0 || isPending}
+                                        className="px-3 py-2 bg-white dark:bg-zinc-800 border border-rose-200 dark:border-rose-800/50 text-rose-600 dark:text-rose-400 rounded-lg text-sm font-medium hover:bg-rose-50 dark:hover:bg-rose-900/20 disabled:opacity-50 transition-colors flex items-center gap-1.5 whitespace-nowrap"
+                                    >
+                                        <Unplug className="w-4 h-4" /> 연결 해제 ({selectedRightAccounts.size})
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto p-2 space-y-1 min-h-0">
+                                {rightFilteredAccounts.map(acc => {
+                                    const isSelected = selectedRightAccounts.has(acc.id);
+
+                                    return (
+                                        <div key={acc.id} onClick={() => toggleRightAccount(acc.id)} className={`flex items-start gap-3 p-3 rounded-lg cursor-pointer transition-colors border ${isSelected ? 'bg-rose-50 border-rose-200 dark:bg-rose-500/10 dark:border-rose-500/30' : 'border-transparent hover:bg-zinc-50 dark:hover:bg-zinc-800/50'}`}>
+                                            <div className="mt-0.5">
+                                                <div className={`w-4 h-4 rounded border flex items-center justify-center ${isSelected ? 'bg-rose-600 border-rose-600 text-white' : 'border-zinc-300 dark:border-zinc-600'}`}>{isSelected && <Check className="w-3 h-3" />}</div>
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate flex items-center gap-2">
+                                                    {acc.name}
+                                                    {acc.platform === 'META' ? <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded capitalize">Meta</span> : <span className="text-[10px] font-bold bg-green-100 text-green-700 px-1.5 py-0.5 rounded capitalize">Google</span>}
+                                                </p>
+                                                <p className="text-[11px] font-mono text-zinc-500 mt-1">ID: {acc.id}</p>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                                {rightFilteredAccounts.length === 0 && <div className="text-center py-8 text-sm text-zinc-500">현재 이 팀에 할당된 계정이 없습니다.</div>}
+                            </div>
+                        </>
+                    )}
+                </div>
+
             </div>
         </div>
     );
