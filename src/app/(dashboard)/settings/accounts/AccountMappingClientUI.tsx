@@ -32,6 +32,7 @@ export default function AccountMappingClientUI({ initialAccounts, teams }: Props
     const [leftPlatformFilter, setLeftPlatformFilter] = useState<'ALL' | 'META' | 'GOOGLE'>('ALL');
     const [leftSearchQuery, setLeftSearchQuery] = useState('');
     const [rightSearchQuery, setRightSearchQuery] = useState('');
+    const [teamSearchQuery, setTeamSearchQuery] = useState('');
 
     // Left Column (Accounts NOT assigned to the currently selected team)
     const leftFilteredAccounts = accounts.filter(acc => {
@@ -189,14 +190,26 @@ export default function AccountMappingClientUI({ initialAccounts, teams }: Props
 
                 {/* TOP: Team List */}
                 <div className="flex flex-col bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden shadow-sm">
-                    <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/20">
+                    <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/20 flex flex-col gap-3">
                         <h3 className="font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                             팀 리스트
                             <span className="bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 py-0.5 px-2 rounded-full text-xs">{teams.length}</span>
                         </h3>
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+                            <input
+                                type="text"
+                                placeholder="팀 명 검색..."
+                                value={teamSearchQuery}
+                                onChange={e => setTeamSearchQuery(e.target.value)}
+                                className="w-full pl-9 pr-3 py-2 text-sm bg-zinc-100 dark:bg-zinc-800 border-transparent focus:bg-white dark:focus:bg-zinc-900 border focus:border-indigo-500 rounded-lg outline-none transition-colors"
+                            />
+                        </div>
                     </div>
                     <div className="overflow-y-auto max-h-[260px] p-3 grid grid-cols-2 gap-2">
-                        {teams.map(team => {
+                        {teams
+                            .filter(t => !teamSearchQuery || t.name.toLowerCase().includes(teamSearchQuery.toLowerCase()))
+                            .map(team => {
                             const isSelected = selectedTeam === team.id;
                             const teamAccountsCount = accounts.filter(a => a.assignedTeamId === team.id).length;
 
@@ -216,6 +229,9 @@ export default function AccountMappingClientUI({ initialAccounts, teams }: Props
                                 </div>
                             );
                         })}
+                        {teams.filter(t => !teamSearchQuery || t.name.toLowerCase().includes(teamSearchQuery.toLowerCase())).length === 0 && (
+                            <div className="col-span-2 text-center py-6 text-sm text-zinc-400">검색 결과가 없습니다.</div>
+                        )}
                     </div>
                 </div>
 
