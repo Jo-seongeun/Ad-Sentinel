@@ -4,7 +4,7 @@ import { createClient } from '@/utils/supabase/server';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache';
 
-// Service Role 클라이언트 — RLS 우회 (team_account_map 쓰기 전용)
+// Service Role 클라이언트 — RLS 우회 (DB 쓰기 전용)
 const adminClient = createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -23,12 +23,15 @@ async function requireAdmin() {
 export async function assignAccountsAction(teamId: string, accounts: { id: string, platform: 'META' | 'GOOGLE' }[]) {
     await requireAdmin();
 
+    // UPSERT: Insert or do nothing if it already exists. Actually, we should just insert.
+    // If an account is already mapped to another team, we should maybe UPDATE it.
+    // Let's delete existing mappings for these accounts first so they are cleanly assigned to the new team.
     const accountIds = accounts.map(a => a.id);
 
-    // 1. 기존 매핑 삭제 (한 계정은 하나의 팀에만 속할 수 있음)
+    // 1. Delete old mappings for these specific ad accounts (an account can only belong to one team at a time)
     await adminClient.from('team_account_map').delete().in('ad_account_id', accountIds);
 
-    // 2. 새 매핑 삽입
+    // 2. Insert new mappings
     const payloads = accounts.map(acc => ({
         team_id: teamId,
         platform: acc.platform,
