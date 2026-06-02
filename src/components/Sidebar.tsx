@@ -78,7 +78,7 @@ export default function Sidebar() {
         {
             groupName: '매체 관리',
             items: [
-                { name: '매체 API 연동 관리', href: '/settings/media', icon: Cable, roles: ['SUPER_ADMIN', 'ADMIN'] },
+                { name: '매체 API 연동 관리', href: '/settings/media', icon: Cable, roles: ['SUPER_ADMIN'] },
                 { name: '매체 연결 팀 계정 관리', href: '/settings/accounts', icon: Network, roles: ['SUPER_ADMIN', 'ADMIN'] },
             ]
         },

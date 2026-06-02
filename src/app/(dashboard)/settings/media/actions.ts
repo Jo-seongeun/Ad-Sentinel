@@ -3,14 +3,14 @@
 import { createClient } from '@/utils/supabase/server';
 import { revalidatePath } from 'next/cache';
 
-// Reusable auth check
+// Reusable auth check — 매체 API 연동은 SUPER_ADMIN 전용
 async function requireAdmin() {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Unauthorized');
     const { data: adminData } = await supabase.from('users').select('role').eq('id', user.id).single();
-    if (!adminData || !['SUPER_ADMIN', 'ADMIN'].includes(adminData.role)) {
-        throw new Error('Forbidden');
+    if (!adminData || adminData.role !== 'SUPER_ADMIN') {
+        throw new Error('Forbidden: 슈퍼 관리자만 매체 API 설정을 변경할 수 있습니다.');
     }
     return supabase;
 }
