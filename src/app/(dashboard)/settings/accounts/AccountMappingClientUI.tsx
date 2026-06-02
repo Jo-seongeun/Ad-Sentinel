@@ -8,7 +8,7 @@ export interface AdAccount {
     id: string;
     name: string;
     platform: 'META' | 'GOOGLE';
-    assignedTeamId: string | null;
+    assignedTeamIds: string[];  // 다수 팀 할당 지원 — 빈 배열이면 미할당
 }
 
 export interface Team {
@@ -34,17 +34,23 @@ export default function AccountMappingClientUI({ initialAccounts, teams }: Props
     const [rightSearchQuery, setRightSearchQuery] = useState('');
     const [teamSearchQuery, setTeamSearchQuery] = useState('');
 
-    // Left Column (Accounts NOT assigned to the currently selected team)
+    // 팀 선택 토글: 이미 선택된 팀 클릭 시 선택 해제
+    const handleTeamClick = (teamId: string) => {
+        setSelectedTeam(prev => prev === teamId ? null : teamId);
+        setSelectedRightAccounts(new Set());
+    };
+
+    // Left Column: 선택된 팀에 아직 할당되지 않은 계정
     const leftFilteredAccounts = accounts.filter(acc => {
-        if (selectedTeam && acc.assignedTeamId === selectedTeam) return false;
+        if (selectedTeam && acc.assignedTeamIds.includes(selectedTeam)) return false;
         if (leftPlatformFilter !== 'ALL' && acc.platform !== leftPlatformFilter) return false;
         if (leftSearchQuery && !acc.name.toLowerCase().includes(leftSearchQuery.toLowerCase()) && !acc.id.includes(leftSearchQuery)) return false;
         return true;
     });
 
-    // Right Column (Accounts ASSIGNED to the currently selected team)
+    // Right Column: 선택된 팀에 할당된 계정
     const rightFilteredAccounts = accounts.filter(acc => {
-        if (acc.assignedTeamId !== selectedTeam) return false;
+        if (!selectedTeam || !acc.assignedTeamIds.includes(selectedTeam)) return false;
         if (rightSearchQuery && !acc.name.toLowerCase().includes(rightSearchQuery.toLowerCase()) && !acc.id.includes(rightSearchQuery)) return false;
         return true;
     });
@@ -75,8 +81,12 @@ export default function AccountMappingClientUI({ initialAccounts, teams }: Props
             .filter(a => selectedLeftAccounts.has(a.id))
             .map(a => ({ id: a.id, platform: a.platform }));
 
-        // Optimistic UI update
-        setAccounts(prev => prev.map(acc => selectedLeftAccounts.has(acc.id) ? { ...acc, assignedTeamId: selectedTeam } : acc));
+        // Optimistic UI update: 현재 팀을 assignedTeamIds 배열에 추가
+        setAccounts(prev => prev.map(acc =>
+            selectedLeftAccounts.has(acc.id)
+                ? { ...acc, assignedTeamIds: [...acc.assignedTeamIds, selectedTeam] }
+                : acc
+        ));
         setSelectedLeftAccounts(new Set());
 
         startTransition(async () => {
@@ -84,26 +94,31 @@ export default function AccountMappingClientUI({ initialAccounts, teams }: Props
                 await assignAccountsAction(selectedTeam, accountsToAssign);
             } catch (e) {
                 alert('할당 중 오류가 발생했습니다.');
-                window.location.reload(); // Revert on failure
+                window.location.reload();
             }
         });
     };
 
     const handleUnassign = () => {
-        if (selectedRightAccounts.size === 0) return;
+        if (selectedRightAccounts.size === 0 || !selectedTeam) return;
 
         const idsToUnassign = Array.from(selectedRightAccounts);
+        const currentTeam = selectedTeam;
 
-        // Optimistic UI update
-        setAccounts(prev => prev.map(acc => selectedRightAccounts.has(acc.id) ? { ...acc, assignedTeamId: null } : acc));
+        // Optimistic UI update: 현재 팀만 assignedTeamIds 배열에서 제거
+        setAccounts(prev => prev.map(acc =>
+            selectedRightAccounts.has(acc.id)
+                ? { ...acc, assignedTeamIds: acc.assignedTeamIds.filter(id => id !== currentTeam) }
+                : acc
+        ));
         setSelectedRightAccounts(new Set());
 
         startTransition(async () => {
             try {
-                await unassignAccountsAction(idsToUnassign);
+                await unassignAccountsAction(currentTeam, idsToUnassign);
             } catch (e) {
                 alert('연결 해제 중 오류가 발생했습니다.');
-                window.location.reload(); // Revert on failure
+                window.location.reload();
             }
         });
     };
@@ -150,7 +165,6 @@ export default function AccountMappingClientUI({ initialAccounts, teams }: Props
                 <div className="flex-1 overflow-y-auto p-2 space-y-1">
                     {leftFilteredAccounts.map(acc => {
                         const isSelected = selectedLeftAccounts.has(acc.id);
-                        const assignedTeamStr = acc.assignedTeamId ? teams.find(t => t.id === acc.assignedTeamId)?.name : '미할당';
 
                         return (
                             <div key={acc.id} onClick={() => toggleLeftAccount(acc.id)} className={`flex items-start gap-3 p-3 rounded-lg cursor-pointer transition-colors border ${isSelected ? 'bg-indigo-50 border-indigo-200 dark:bg-indigo-500/10 dark:border-indigo-500/30' : 'border-transparent hover:bg-zinc-50 dark:hover:bg-zinc-800/50'}`}>
@@ -160,10 +174,27 @@ export default function AccountMappingClientUI({ initialAccounts, teams }: Props
                                 <div className="flex-1 min-w-0">
                                     <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate flex items-center gap-2">
                                         {acc.name}
-                                        {acc.platform === 'META' ? <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded capitalize">Meta</span> : <span className="text-[10px] font-bold bg-green-100 text-green-700 px-1.5 py-0.5 rounded capitalize">Google</span>}
+                                        {acc.platform === 'META'
+                                            ? <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded capitalize">Meta</span>
+                                            : <span className="text-[10px] font-bold bg-green-100 text-green-700 px-1.5 py-0.5 rounded capitalize">Google</span>
+                                        }
                                     </p>
                                     <p className="text-[11px] font-mono text-zinc-500 mt-1">ID: {acc.id}</p>
-                                    <p className="text-xs mt-1">{assignedTeamStr === '미할당' ? <span className="text-zinc-400">(미할당)</span> : <span className="text-amber-600 dark:text-amber-500">할당됨: {assignedTeamStr}</span>}</p>
+                                    {/* 다수 팀 할당 뱃지 표시 */}
+                                    <div className="mt-1.5 flex flex-wrap gap-1">
+                                        {acc.assignedTeamIds.length === 0 ? (
+                                            <span className="text-zinc-400 text-xs">(미할당)</span>
+                                        ) : (
+                                            acc.assignedTeamIds.map(tid => {
+                                                const teamName = teams.find(t => t.id === tid)?.name ?? tid;
+                                                return (
+                                                    <span key={tid} className="inline-flex items-center text-[10px] font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded-md">
+                                                        {teamName}
+                                                    </span>
+                                                );
+                                            })
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         );
@@ -191,10 +222,21 @@ export default function AccountMappingClientUI({ initialAccounts, teams }: Props
                 {/* TOP: Team List */}
                 <div className="flex flex-col bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden shadow-sm">
                     <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/20 flex flex-col gap-3">
-                        <h3 className="font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                            팀 리스트
-                            <span className="bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 py-0.5 px-2 rounded-full text-xs">{teams.length}</span>
-                        </h3>
+                        <div className="flex items-center justify-between">
+                            <h3 className="font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                                팀 리스트
+                                <span className="bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 py-0.5 px-2 rounded-full text-xs">{teams.length}</span>
+                            </h3>
+                            {/* 선택 해제 버튼 */}
+                            {selectedTeam && (
+                                <button
+                                    onClick={() => { setSelectedTeam(null); setSelectedRightAccounts(new Set()); }}
+                                    className="text-xs text-zinc-500 hover:text-rose-600 dark:hover:text-rose-400 font-medium transition-colors flex items-center gap-1"
+                                >
+                                    <span className="text-base leading-none">×</span> 선택 해제
+                                </button>
+                            )}
+                        </div>
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
                             <input
@@ -211,12 +253,13 @@ export default function AccountMappingClientUI({ initialAccounts, teams }: Props
                             .filter(t => !teamSearchQuery || t.name.toLowerCase().includes(teamSearchQuery.toLowerCase()))
                             .map(team => {
                             const isSelected = selectedTeam === team.id;
-                            const teamAccountsCount = accounts.filter(a => a.assignedTeamId === team.id).length;
+                            // 해당 팀에 할당된 계정 수 집계
+                            const teamAccountsCount = accounts.filter(a => a.assignedTeamIds.includes(team.id)).length;
 
                             return (
                                 <div
                                     key={team.id}
-                                    onClick={() => { setSelectedTeam(team.id); setSelectedRightAccounts(new Set()); }}
+                                    onClick={() => handleTeamClick(team.id)}
                                     className={`p-3 rounded-xl border-2 transition-all cursor-pointer ${isSelected ? 'border-indigo-600 bg-indigo-50/50 dark:bg-indigo-500/10' : 'border-zinc-200 dark:border-zinc-700 hover:border-indigo-300 hover:shadow-sm'}`}
                                 >
                                     <div className="flex justify-between items-center mb-1">
@@ -275,6 +318,8 @@ export default function AccountMappingClientUI({ initialAccounts, teams }: Props
                             <div className="flex-1 overflow-y-auto p-2 space-y-1 min-h-0">
                                 {rightFilteredAccounts.map(acc => {
                                     const isSelected = selectedRightAccounts.has(acc.id);
+                                    // 선택된 팀 외에 추가로 할당된 다른 팀들
+                                    const otherTeamIds = acc.assignedTeamIds.filter(id => id !== selectedTeam);
 
                                     return (
                                         <div key={acc.id} onClick={() => toggleRightAccount(acc.id)} className={`flex items-start gap-3 p-3 rounded-lg cursor-pointer transition-colors border ${isSelected ? 'bg-rose-50 border-rose-200 dark:bg-rose-500/10 dark:border-rose-500/30' : 'border-transparent hover:bg-zinc-50 dark:hover:bg-zinc-800/50'}`}>
@@ -284,9 +329,26 @@ export default function AccountMappingClientUI({ initialAccounts, teams }: Props
                                             <div className="flex-1 min-w-0">
                                                 <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate flex items-center gap-2">
                                                     {acc.name}
-                                                    {acc.platform === 'META' ? <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded capitalize">Meta</span> : <span className="text-[10px] font-bold bg-green-100 text-green-700 px-1.5 py-0.5 rounded capitalize">Google</span>}
+                                                    {acc.platform === 'META'
+                                                        ? <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded capitalize">Meta</span>
+                                                        : <span className="text-[10px] font-bold bg-green-100 text-green-700 px-1.5 py-0.5 rounded capitalize">Google</span>
+                                                    }
                                                 </p>
                                                 <p className="text-[11px] font-mono text-zinc-500 mt-1">ID: {acc.id}</p>
+                                                {/* 이 팀 외에 추가로 할당된 팀 표시 */}
+                                                {otherTeamIds.length > 0 && (
+                                                    <div className="mt-1.5 flex flex-wrap gap-1">
+                                                        <span className="text-[10px] text-zinc-400">+공유:</span>
+                                                        {otherTeamIds.map(tid => {
+                                                            const teamName = teams.find(t => t.id === tid)?.name ?? tid;
+                                                            return (
+                                                                <span key={tid} className="inline-flex items-center text-[10px] font-medium bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400 px-1.5 py-0.5 rounded-md">
+                                                                    {teamName}
+                                                                </span>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     );

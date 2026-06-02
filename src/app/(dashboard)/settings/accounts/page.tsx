@@ -74,12 +74,14 @@ export default async function AccountMappingPage() {
 
             // Map to our UI format
             uniqueAccountsMap.forEach((acc) => {
-                const mappedInfo = mappings.find(m => m.ad_account_id === acc.id && m.platform === 'META');
+                const assignedTeamIds = mappings
+                    .filter(m => m.ad_account_id === acc.id && m.platform === 'META')
+                    .map(m => m.team_id);
                 initialAccounts.push({
                     id: acc.id,
                     name: acc.name || `Meta Account (${acc.account_id})`,
                     platform: 'META',
-                    assignedTeamId: mappedInfo ? mappedInfo.team_id : null
+                    assignedTeamIds
                 });
             });
 
@@ -156,12 +158,14 @@ export default async function AccountMappingPage() {
                             const cid = row.customerClient.id;
                             const name = row.customerClient.descriptiveName || `Google Ads Account (${cid})`;
                             
-                            const mappedInfo = mappings.find(m => m.ad_account_id === cid && m.platform === 'GOOGLE');
+                            const assignedTeamIds = mappings
+                                .filter(m => m.ad_account_id === cid && m.platform === 'GOOGLE')
+                                .map(m => m.team_id);
                             initialAccounts.push({
                                 id: cid,
                                 name: name,
                                 platform: 'GOOGLE',
-                                assignedTeamId: mappedInfo ? mappedInfo.team_id : null
+                                assignedTeamIds
                             });
                         }
                     }
