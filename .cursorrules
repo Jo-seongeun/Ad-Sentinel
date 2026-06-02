@@ -7,5 +7,6 @@ Strictly follow this format (PowerShell):
 git add .
 git commit -m '업데이트: [여기에 수정된 내용을 한글로 요약해서 넣으세요]'
 git push origin master
-$env:VERCEL_TOKEN = (Get-Content .env.local | Select-String 'VERCEL_OIDC_TOKEN="?([^"]+)"?' | ForEach-Object { $_.Matches.Groups[1].Value }); npx vercel --prod --yes --token $env:VERCEL_TOKEN
 ```
+
+Note: Vercel deploys automatically via GitHub integration when pushed to master.
