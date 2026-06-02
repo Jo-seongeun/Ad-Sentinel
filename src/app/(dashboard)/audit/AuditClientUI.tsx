@@ -255,7 +255,7 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
                         </div>
                         <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mt-2">미디어믹스 엑셀 파일 업로드</h3>
                         <p className="text-sm text-zinc-500 max-w-sm mx-auto">
-                            드래그 앤 드롭 하거나 영역을 클릭하여 엑셀(.xlsx) 파일을 업로드해주세요. 양식은 15개의 표준 컬럼을 준수해야 합니다.
+                            드래그 앤 드롭 하거나 영역을 클릭하여 엑셀(.xlsx) 파일을 업로드해주세요. 양식은 22개의 표준 컬럼을 준수해야 합니다.
                         </p>
                     </div>
 

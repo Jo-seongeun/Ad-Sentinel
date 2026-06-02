@@ -1,16 +1,23 @@
 import { createClient } from '@/utils/supabase/server';
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import AccountMappingClientUI, { AdAccount, Team } from './AccountMappingClientUI';
 import { AlertCircle } from 'lucide-react';
+
+// Service Role 클라이언트 — RLS 우회 (팀 및 계정 매핑 전체 조회용)
+const adminClient = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 export default async function AccountMappingPage() {
     const supabase = await createClient();
 
-    // 1. Fetch real teams from DB
-    const { data: teamsData } = await supabase.from('teams').select('id, name');
+    // 1. Fetch real teams from DB — adminClient로 RLS 우회 (관리자 페이지이므로 전체 팀 조회 필요)
+    const { data: teamsData } = await adminClient.from('teams').select('id, name');
     const teams: Team[] = teamsData || [];
 
-    // 2. Fetch existing mappings from DB
-    const { data: mappingsData } = await supabase.from('team_account_map').select('*');
+    // 2. Fetch existing mappings from DB — adminClient로 RLS 우회 (모든 팀의 매핑을 조회해야 함)
+    const { data: mappingsData } = await adminClient.from('team_account_map').select('*');
     const mappings = mappingsData || [];
 
     // 3. Fetch Meta Access Token and BM ID
