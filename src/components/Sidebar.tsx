@@ -13,7 +13,8 @@ import {
     UserCheck,
     RefreshCw,
     Network,
-    FolderGit2
+    FolderGit2,
+    MonitorSmartphone
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
@@ -80,6 +81,7 @@ export default function Sidebar() {
             items: [
                 { name: '매체 API 연동 관리', href: '/settings/media', icon: Cable, roles: ['SUPER_ADMIN'] },
                 { name: '매체 연결 팀 계정 관리', href: '/settings/accounts', icon: Network, roles: ['SUPER_ADMIN', 'ADMIN'] },
+                { name: '팀 연결 매체 확인', href: '/settings/team-media', icon: MonitorSmartphone, roles: ['SUPER_ADMIN', 'ADMIN', 'TEAM_MANAGER', 'MEMBER'] },
             ]
         },
         {
