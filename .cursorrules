@@ -2,10 +2,10 @@ Every time you provide an answer that involves code changes or task completion, 
 
 The commit message must be a concise summary of the actual changes you made, written in Korean. 
 
-Strictly follow this format:
-```bash
+Strictly follow this format (PowerShell):
+```powershell
 git add .
 git commit -m '업데이트: [여기에 수정된 내용을 한글로 요약해서 넣으세요]'
 git push origin master
-npx vercel --prod --yes --token $VERCEL_TOKEN
+$env:VERCEL_TOKEN = (Get-Content .env.local | Select-String 'VERCEL_OIDC_TOKEN="?([^"]+)"?' | ForEach-Object { $_.Matches.Groups[1].Value }); npx vercel --prod --yes --token $env:VERCEL_TOKEN
 ```
