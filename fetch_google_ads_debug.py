@@ -21,7 +21,7 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 # 사용자 설정 영역
 # ==========================================
 # 구글 애즈에서 검수할 하위 클라이언트 계정 ID (하이픈 없이 10자리 숫자)
-TARGET_CUSTOMER_ID = '6823217446' 
+TARGET_CUSTOMER_ID = '3544680803' 
 # ==========================================
 
 print(f"[Info] 설정된 대상 계정 ID: {TARGET_CUSTOMER_ID}")
@@ -102,8 +102,10 @@ for chunk in budget_res.json():
                 'lifetime': int(budget.get('totalAmountMicros', 0)) // 1000000
             }
 
-# 4-2. 광고(Ad) 데이터 가져오기
-query = """
+# ──────────────────────────────────────────────────────────────────────────────
+# 4-2. [쿼리 A] ad_group_ad 기반 — Search / Shopping / Display 등 일반 캠페인
+# ──────────────────────────────────────────────────────────────────────────────
+ad_group_query = """
     SELECT 
         customer.currency_code,
         campaign.id,
@@ -130,70 +132,138 @@ query = """
     LIMIT 500
 """
 
-response = requests.post(search_url, headers=headers, json={'query': query})
-
-if response.status_code != 200:
-    print("! Google Ads API Error:", response.status_code, response.text)
+response_a = requests.post(search_url, headers=headers, json={'query': ad_group_query})
+if response_a.status_code != 200:
+    print("! [쿼리A] Google Ads API Error:", response_a.status_code, response_a.text)
     exit(1)
 
-ads_data = response.json()
 records_to_insert = []
 
-# searchStream은 JSON 배열의 배열로 반환됨 (결과 청크)
-for chunk in ads_data:
+print("[Info] [쿼리A] ad_group_ad 기반 일반 캠페인 파싱 중...")
+for chunk in response_a.json():
     for row in chunk.get('results', []):
-        campaign = row.get('campaign', {})
-        ad_group = row.get('adGroup', {})
-        ad_group_ad = row.get('adGroupAd', {})
-        ad = ad_group_ad.get('ad', {})
-        customer = row.get('customer', {})
-        
-        # URL / UTM 파라미터 파싱
-        final_urls = ad.get('finalUrls', [])
-        landing_url = final_urls[0] if final_urls else ''
-        
-        utm_params = []
-        tracking_template = ad.get('trackingUrlTemplate', '')
-        custom_params = ad.get('urlCustomParameters', [])
-        
-        if tracking_template:
-            utm_params.append(tracking_template)
-            
-        utm_string = ", ".join(utm_params)
-        
-        # 캠페인 ID를 키로 예산 딕셔너리에서 예산 조회
-        camp_id = campaign.get('id')
+        campaign  = row.get('campaign', {})
+        ad_group  = row.get('adGroup', {})
+        ad_grp_ad = row.get('adGroupAd', {})
+        ad        = ad_grp_ad.get('ad', {})
+        customer  = row.get('customer', {})
+
+        final_urls       = ad.get('finalUrls', [])
+        landing_url      = final_urls[0] if final_urls else ''
+        tracking_tpl     = ad.get('trackingUrlTemplate', '')
+        utm_string       = tracking_tpl if tracking_tpl else ''
+
+        camp_id     = campaign.get('id')
+        camp_type   = campaign.get('advertisingChannelType', '')
         camp_budget = budgets_dict.get(camp_id, {'daily': 0, 'lifetime': 0})
-        
+
         record = {
-            'account_id': TARGET_CUSTOMER_ID,
-            'campaign_id': camp_id,
-            'campaign_name': campaign.get('name'),
-            'currency': customer.get('currencyCode', 'KRW'),
-            'campaign_daily_budget': camp_budget['daily'],
+            'account_id':               TARGET_CUSTOMER_ID,
+            'campaign_id':              camp_id,
+            'campaign_name':            campaign.get('name'),
+            'currency':                 customer.get('currencyCode', 'KRW'),
+            'campaign_daily_budget':    camp_budget['daily'],
             'campaign_lifetime_budget': camp_budget['lifetime'],
-            'campaign_start_time': campaign.get('startDate'),
-            'campaign_stop_time': campaign.get('endDate'),
-            'adset_id': ad_group.get('id'), # Meta의 AdSet -> Google의 AdGroup
-            'adset_name': ad_group.get('name'),
-            'adset_daily_budget': 0, # 구글은 주로 캠페인 예산을 사용함
-            'adset_lifetime_budget': 0,
-            'campaign_objective': campaign.get('advertisingChannelType'),
-            'campaign_buying_type': campaign.get('biddingStrategyType'),
-            'ad_id': ad.get('id'),
-            'ad_name': ad.get('name', 'Google Ad (Name Missing)'),
-            'landing_url': landing_url,
-            'utm_parameters': utm_string,
-            'adset_optimization_goal': ad_group.get('type'),
-            'adset_billing_event': None,
-            'adset_pixel_id': None,
-            'adset_custom_event_type': None,
-            'adset_targeting': None,
-            'effective_status': ad_group_ad.get('status')
+            'campaign_start_time':      campaign.get('startDate'),
+            'campaign_stop_time':       campaign.get('endDate'),
+            'adset_id':                 ad_group.get('id'),
+            'adset_name':               ad_group.get('name'),
+            'adset_daily_budget':       0,
+            'adset_lifetime_budget':    0,
+            'campaign_objective':       camp_type,
+            'campaign_buying_type':     campaign.get('biddingStrategyType'),
+            'ad_id':                    ad.get('id'),
+            'ad_name':                  ad.get('name') or 'Google Ad (Name Missing)',
+            'landing_url':              landing_url,
+            'utm_parameters':           utm_string,
+            'adset_optimization_goal':  ad_group.get('type'),
+            'adset_billing_event':      None,
+            'adset_pixel_id':           None,
+            'adset_custom_event_type':  None,
+            'adset_targeting':          None,
+            'effective_status':         ad_grp_ad.get('status'),
         }
         records_to_insert.append(record)
+        print(f"  → [A][{camp_type}] {campaign.get('name')} / adGroup: {ad_group.get('name')} | 상태: {ad_grp_ad.get('status')}")
 
-print(f"[Info] 총 {len(records_to_insert)}개의 활성화된 광고를 발견했습니다.")
+# ──────────────────────────────────────────────────────────────────────────────
+# 4-3. [쿼리 B] 캠페인 보완 쿼리
+#   — 쿼리 A(ad_group_ad)에서 이미 수집된 campaign_id를 제외하고
+#     나머지 캠페인(PAUSED 일반 캠페인 + PMax 전체)을 campaign 테이블에서 직접 조회
+# ──────────────────────────────────────────────────────────────────────────────
+
+# 쿼리 A에서 이미 수집된 campaign_id 집합
+collected_campaign_ids = set(r['campaign_id'] for r in records_to_insert)
+
+campaign_fallback_query = """
+    SELECT 
+        customer.currency_code,
+        campaign.id,
+        campaign.name,
+        campaign.status,
+        campaign.advertising_channel_type,
+        campaign.bidding_strategy_type,
+        campaign.start_date,
+        campaign.end_date
+    FROM campaign
+    WHERE campaign.status IN ('ENABLED', 'PAUSED')
+    LIMIT 500
+"""
+
+response_b = requests.post(search_url, headers=headers, json={'query': campaign_fallback_query})
+if response_b.status_code != 200:
+    print("! [쿼리B] Campaign Fallback Query Error:", response_b.status_code, response_b.text)
+    exit(1)
+
+print("[Info] [쿼리B] 누락 캠페인 보완 중 (쿼리A에서 수집되지 않은 캠페인)...")
+for chunk in response_b.json():
+    for row in chunk.get('results', []):
+        campaign  = row.get('campaign', {})
+        customer  = row.get('customer', {})
+
+        camp_id     = campaign.get('id')
+        camp_type   = campaign.get('advertisingChannelType', '')
+        camp_budget = budgets_dict.get(camp_id, {'daily': 0, 'lifetime': 0})
+
+        # 쿼리 A에서 이미 ad_group 단위로 수집된 캠페인은 스킵 (중복 방지)
+        if camp_id in collected_campaign_ids:
+            continue
+
+        record = {
+            'account_id':               TARGET_CUSTOMER_ID,
+            'campaign_id':              camp_id,
+            'campaign_name':            campaign.get('name'),
+            'currency':                 customer.get('currencyCode', 'KRW'),
+            'campaign_daily_budget':    camp_budget['daily'],
+            'campaign_lifetime_budget': camp_budget['lifetime'],
+            'campaign_start_time':      campaign.get('startDate'),
+            'campaign_stop_time':       campaign.get('endDate'),
+            # ad_group 없음 (PMax) 또는 PAUSED로 쿼리A 미수집 — 캠페인 기준 단일 행
+            'adset_id':                 None,
+            'adset_name':               None,
+            'adset_daily_budget':       0,
+            'adset_lifetime_budget':    0,
+            'campaign_objective':       camp_type,
+            'campaign_buying_type':     campaign.get('biddingStrategyType'),
+            'ad_id':                    None,
+            'ad_name':                  None,
+            'landing_url':              None,
+            'utm_parameters':           None,
+            'adset_optimization_goal':  None,
+            'adset_billing_event':      None,
+            'adset_pixel_id':           None,
+            'adset_custom_event_type':  None,
+            'adset_targeting':          None,
+            'effective_status':         campaign.get('status'),
+        }
+        records_to_insert.append(record)
+        print(f"  → [B][{camp_type}] {campaign.get('name')} (ID: {camp_id}) | 상태: {campaign.get('status')} | 일예산: {camp_budget['daily']:,}")
+
+print(f"[Info] 총 {len(records_to_insert)}개 행 수집 완료")
+print(f"       ├─ 쿼리A (ad_group 단위): {len(collected_campaign_ids)}개 캠페인")
+print(f"       └─ 쿼리B (캠페인 보완):   {len(records_to_insert) - len(collected_campaign_ids)}개 캠페인")
+
+
 
 # 5. Supabase에 일괄 저장
 if records_to_insert:

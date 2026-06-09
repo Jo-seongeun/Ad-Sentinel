@@ -125,7 +125,7 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                 if (mccId) gaqlHeaders['login-customer-id'] = mccId;
 
                 // 1. Campaign budget query (separate due to GAQL join restriction)
-                const budgetQuery = `SELECT campaign.id, campaign_budget.amount_micros, campaign_budget.total_amount_micros FROM campaign WHERE campaign.status = 'ENABLED'`;
+                const budgetQuery = `SELECT campaign.id, campaign_budget.amount_micros, campaign_budget.total_amount_micros FROM campaign WHERE campaign.status IN ('ENABLED', 'PAUSED')`;
                 const budgetRes = await fetch(
                     `https://googleads.googleapis.com/v22/customers/${custId}/googleAds:searchStream`,
                     { method: 'POST', headers: gaqlHeaders, body: JSON.stringify({ query: budgetQuery }) }
@@ -141,7 +141,7 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                     }
                 }
 
-                // 2. Ad group + ad query
+                // 2. [쿼리 A] Ad group + ad query — Search / Shopping / Display 등 일반 캠페인
                 const adQuery = `SELECT customer.currency_code, campaign.id, campaign.name, campaign.status, campaign.advertising_channel_type, campaign.start_date, campaign.end_date, ad_group.id, ad_group.name, ad_group.status, ad_group_ad.ad.id, ad_group_ad.ad.name, ad_group_ad.status, ad_group_ad.ad.final_urls, ad_group_ad.ad.tracking_url_template FROM ad_group_ad WHERE ad_group_ad.status = 'ENABLED' AND campaign.status = 'ENABLED' AND ad_group.status = 'ENABLED' LIMIT 1000`;
                 const adRes = await fetch(
                     `https://googleads.googleapis.com/v22/customers/${custId}/googleAds:searchStream`,
@@ -164,7 +164,6 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                             const ad = adGroupAd.ad || {};
                             const budget = budgetsDict[camp.id] || {};
 
-                            // Build flat campaign record (deduplicate by campaign id)
                             if (!campaigns.find((c: any) => c.id === camp.id)) {
                                 campaigns.push({
                                     id: camp.id,
@@ -190,7 +189,39 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                     }
                 }
 
+                // 3. [쿼리 B] Campaign 보완 쿼리
+                //    — 쿼리 A에서 수집되지 않은 캠페인(PMax, PAUSED 등)을 campaign 테이블에서 직접 조회
+                const collectedCampaignIds = new Set(campaigns.map((c: any) => String(c.id)));
+                const campaignFallbackQuery = `SELECT customer.currency_code, campaign.id, campaign.name, campaign.status, campaign.advertising_channel_type, campaign.start_date, campaign.end_date FROM campaign WHERE campaign.status IN ('ENABLED', 'PAUSED') LIMIT 500`;
+                const campaignFallbackRes = await fetch(
+                    `https://googleads.googleapis.com/v22/customers/${custId}/googleAds:searchStream`,
+                    { method: 'POST', headers: gaqlHeaders, body: JSON.stringify({ query: campaignFallbackQuery }) }
+                );
+                const campaignFallbackData = await campaignFallbackRes.json();
+
+                if (Array.isArray(campaignFallbackData)) {
+                    for (const chunk of campaignFallbackData) {
+                        for (const r of (chunk.results || [])) {
+                            currency = r.customer?.currencyCode || currency;
+                            const camp = r.campaign || {};
+                            // 쿼리 A에서 이미 수집된 캠페인은 스킵 (중복 방지)
+                            if (collectedCampaignIds.has(String(camp.id))) continue;
+                            const budget = budgetsDict[camp.id] || {};
+                            campaigns.push({
+                                id: camp.id,
+                                name: camp.name,
+                                startDate: camp.startDate,
+                                endDate: camp.endDate,
+                                channelType: camp.advertisingChannelType,
+                                dailyBudget: Math.round((Number(budget.amountMicros) || 0) / 1000000),
+                                lifetimeBudget: Math.round((Number(budget.totalAmountMicros) || 0) / 1000000),
+                            });
+                        }
+                    }
+                }
+
                 liveGoogleCache[custId] = { campaigns, adGroups, ads, currency };
+
             } catch (e) {
                 console.error(`Google Ads API Error for customer ${custId}:`, e);
                 liveGoogleCache[custId] = { campaigns: [], adGroups: [], ads: [], currency: 'KRW' };
