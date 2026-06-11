@@ -188,7 +188,49 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
                     CustomEventType: item['이벤트 유형'] || ''
                 }));
 
+                // ── Fill-down (값 승계) ──────────────────────────────────────────
+                // 캠페인/세트 레벨 공통 필드: 원본 Raw 셀이 비어있으면 위 행 값을 승계
+                // 광고명·랜딩URL·UTM은 광고 단위 고유값 → 승계 제외
+                //
+                // 승계 필드 → 원본 Excel 헤더명 매핑
+                const FILL_DOWN_MAP: { field: keyof ParsedRow; header: string }[] = [
+                    { field: 'Platform',               header: '매체' },
+                    { field: 'Team',                   header: '팀명' },
+                    { field: 'AccountID',              header: '계정 ID' },
+                    { field: 'CampaignID',             header: '캠페인 ID' },
+                    { field: 'CampaignName',           header: '캠페인명' },
+                    { field: 'Currency',               header: '통화' },
+                    { field: 'CampaignDailyBudget',    header: '캠페인 일 예산' },
+                    { field: 'CampaignLifetimeBudget', header: '캠페인 예산' },
+                    { field: 'StartDate',              header: '시작일' },
+                    { field: 'EndDate',                header: '종료일' },
+                    { field: 'CampaignObjective',      header: '캠페인 목적' },
+                    { field: 'CampaignBuyingType',     header: '구매 유형' },
+                    { field: 'AdSetName',              header: '광고 세트명' },
+                    { field: 'AdSetDailyBudget',       header: '광고 세트 일 예산' },
+                    { field: 'AdSetLifetimeBudget',    header: '광고 세트 예산' },
+                    { field: 'AdSetOptimizationGoal',  header: '최적화 목표' },
+                    { field: 'AdSetBillingEvent',      header: '과금 기준' },
+                    { field: 'PixelID',                header: '픽셀/이벤트' },
+                    { field: 'CustomEventType',        header: '이벤트 유형' },
+                    // ↓ 승계 제외: AdName, LandingURL, UTMParameters (광고 단위 고유값)
+                ];
+
+                for (let i = 1; i < mappedData.length; i++) {
+                    for (const { field, header } of FILL_DOWN_MAP) {
+                        // 원본 Raw 데이터 기준으로 "진짜 빈 칸"인지 판별
+                        // — 숫자 0을 명시적으로 입력한 경우는 승계하지 않음
+                        const rawVal = data[i][header];
+                        const isTrulyBlank = rawVal === undefined || rawVal === null || rawVal === '';
+                        if (isTrulyBlank) {
+                            (mappedData[i] as any)[field] = (mappedData[i - 1] as any)[field];
+                        }
+                    }
+                }
+                // ────────────────────────────────────────────────────────────────
+
                 setRows(mappedData);
+
                 setResults(null);
             } catch (error) {
                 console.error('Excel Parsing Error:', error);
