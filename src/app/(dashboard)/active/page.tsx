@@ -58,7 +58,15 @@ export default async function ActiveDashboardPage() {
     if (token && accountIds.length > 0) {
         try {
             const promises = accountIds.map(async (actId) => {
-                const res = await fetch(`https://graph.facebook.com/v19.0/${actId.startsWith('act_') ? actId : `act_${actId}`}/campaigns?fields=id,name,objective,effective_status,status&limit=10&access_token=${token}`);
+                // 예산 소진율 계산을 위해 예산·날짜·누적 지출액 필드 추가
+                const fields = [
+                    'id', 'name', 'objective', 'effective_status', 'status',
+                    'daily_budget', 'lifetime_budget',
+                    'start_time', 'stop_time',
+                    'insights.date_preset(lifetime){spend}',   // 캠페인 시작일 기준 누적 지출액
+                ].join(',');
+                const url = `https://graph.facebook.com/v19.0/${actId.startsWith('act_') ? actId : `act_${actId}`}/campaigns?fields=${fields}&limit=50&access_token=${token}`;
+                const res = await fetch(url, { cache: 'no-store' });
                 if (res.ok) {
                     const json = await res.json();
                     return (json.data || []).map((c: any) => ({ ...c, account_id: actId }));
@@ -66,7 +74,8 @@ export default async function ActiveDashboardPage() {
                 return [];
             });
             const results = await Promise.all(promises);
-            liveCampaigns = results.flat().sort((a, b) => (a.effective_status === 'ACTIVE' ? -1 : 1)); // Active first
+            // ACTIVE 캠페인만 필터링해서 전달
+            liveCampaigns = results.flat().filter((c: any) => c.effective_status === 'ACTIVE');
         } catch (error) {
             console.error('Failed to fetch live campaigns', error);
         }

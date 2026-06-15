@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import {
-    Activity, ArrowUpRight, ArrowDownRight, DollarSign, MousePointerClick,
-    TrendingUp, Users, AlertTriangle, CheckCircle2, BarChart3, Clock, AlertCircle
+    DollarSign, MousePointerClick,
+    TrendingUp, Users, CheckCircle2, BarChart3, Clock,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -18,8 +18,63 @@ export default function ActiveDashboardClientUI({
 }) {
     const [activeTab, setActiveTab] = useState<'meta' | 'google'>('meta');
 
+    // ── 예산 소진율 계산 ─────────────────────────────────────────────────
+    // Meta API: daily_budget / lifetime_budget → 최소 화폐 단위(×100) 반환
+    //           insights.spend → 실제 금액 문자열 (예: "1245.00")
+    const calcBurnRate = (camp: any): number | null => {
+        const spend = parseFloat(camp.insights?.data?.[0]?.spend ?? '0');
+
+        let totalBudget = 0;
+        if (camp.lifetime_budget) {
+            // 기간 예산 캠페인
+            totalBudget = parseFloat(camp.lifetime_budget) / 100;
+        } else if (camp.daily_budget && camp.start_time && camp.stop_time) {
+            // 일 예산 캠페인 → 총 기간(일) × 일 예산으로 추정
+            const start = new Date(camp.start_time);
+            const end   = new Date(camp.stop_time);
+            const days  = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / 86400000));
+            totalBudget = (parseFloat(camp.daily_budget) / 100) * days;
+        } else if (camp.daily_budget) {
+            totalBudget = parseFloat(camp.daily_budget) / 100;
+        }
+
+        if (totalBudget <= 0) return null;
+        return Math.min((spend / totalBudget) * 100, 100);
+    };
+
+    // ── 기간 진행률 계산 ─────────────────────────────────────────────────
+    const calcPeriodProgress = (camp: any): number | null => {
+        if (!camp.start_time || !camp.stop_time) return null;
+        const start = new Date(camp.start_time);
+        const end   = new Date(camp.stop_time);
+        const now   = new Date();
+        if (now <= start) return 0;
+        if (now >= end)   return 100;
+        return ((now.getTime() - start.getTime()) / (end.getTime() - start.getTime())) * 100;
+    };
+
+    // ── 예산 소진 상태 뱃지 ──────────────────────────────────────────────
+    // 기간 진행률 대비 예산 소진율 차이 ±15% 기준
+    //   정상   : |소진율 - 기간 진행률| ≤ 15%
+    //   미 소진: 소진율 < 기간 진행률 - 15%  (예산을 덜 쓰고 있음)
+    //   과 소진: 소진율 > 기간 진행률 + 15%  (예산을 너무 빨리 소진)
+    const getBurnStatus = (burnRate: number | null, periodProgress: number | null) => {
+        if (burnRate === null || periodProgress === null) {
+            return { label: '정보 없음', color: 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400' };
+        }
+        const diff = burnRate - periodProgress;
+        if (Math.abs(diff) <= 15) {
+            return { label: '✅ 정상',    color: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' };
+        } else if (diff < -15) {
+            return { label: '🟡 미 소진', color: 'bg-yellow-50 text-yellow-700 dark:bg-yellow-500/10 dark:text-yellow-400' };
+        } else {
+            return { label: '🔴 과 소진', color: 'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400' };
+        }
+    };
+
     return (
         <div className="space-y-6 max-w-7xl animate-in fade-in duration-500 pb-12">
+            {/* 헤더 배너 */}
             <div className="relative overflow-hidden bg-gradient-to-r from-indigo-600 to-violet-600 rounded-2xl shadow-lg p-8 text-white">
                 <div className="relative z-10">
                     <h1 className="text-3xl font-bold tracking-tight mb-2">실시간 대시보드</h1>
@@ -32,6 +87,7 @@ export default function ActiveDashboardClientUI({
                 </div>
             </div>
 
+            {/* 탭 */}
             <div className="flex items-center gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-px">
                 <button
                     onClick={() => setActiveTab('meta')}
@@ -59,9 +115,13 @@ export default function ActiveDashboardClientUI({
                 </div>
             ) : (
                 <>
+                    {/* KPI 카드 */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                         {kpis.map((kpi, index) => {
-                            const Icon = kpi.icon === 'DollarSign' ? DollarSign : kpi.icon === 'Users' ? Users : kpi.icon === 'MousePointerClick' ? MousePointerClick : TrendingUp;
+                            const Icon = kpi.icon === 'DollarSign' ? DollarSign
+                                       : kpi.icon === 'Users' ? Users
+                                       : kpi.icon === 'MousePointerClick' ? MousePointerClick
+                                       : TrendingUp;
                             return (
                                 <div key={index} className="bg-white dark:bg-zinc-900 rounded-xl p-6 border border-zinc-200 dark:border-zinc-800 shadow-sm relative overflow-hidden group">
                                     <div className="flex justify-between items-start mb-4">
@@ -71,7 +131,7 @@ export default function ActiveDashboardClientUI({
                                     </div>
                                     <h3 className="text-zinc-500 dark:text-zinc-400 text-sm font-medium">{kpi.title}</h3>
                                     <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-50 mt-1">{kpi.value.toLocaleString()}</p>
-                                    <div className="absolute -bottom-4 -right-4 opactity-5 text-indigo-100 dark:text-zinc-800 transform rotate-12 group-hover:rotate-0 transition-transform duration-500 z-0 opacity-10">
+                                    <div className="absolute -bottom-4 -right-4 text-indigo-100 dark:text-zinc-800 transform rotate-12 group-hover:rotate-0 transition-transform duration-500 z-0 opacity-10">
                                         <Icon className="w-24 h-24" />
                                     </div>
                                 </div>
@@ -80,51 +140,97 @@ export default function ActiveDashboardClientUI({
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* ── 팀 매핑 라이브 캠페인 테이블 ── */}
                         <div className="lg:col-span-2 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden flex flex-col h-96">
                             <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/40 shrink-0">
                                 <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                                     팀 매핑 라이브 캠페인
                                     <span className="bg-indigo-100 text-indigo-700 text-[10px] px-2 py-0.5 rounded-full uppercase font-bold tracking-wider">Live</span>
+                                    <span className="ml-auto text-xs font-normal text-zinc-400">ACTIVE 캠페인만 표시</span>
                                 </h2>
                             </div>
                             <div className="flex-1 overflow-y-auto custom-scrollbar">
                                 <table className="w-full text-sm text-left">
                                     <thead className="text-xs text-zinc-500 dark:text-zinc-400 uppercase bg-zinc-50 dark:bg-zinc-900/60 font-semibold border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-10">
                                         <tr>
-                                            <th className="px-6 py-4">계정 ID</th>
-                                            <th className="px-6 py-4">캠페인 명</th>
-                                            <th className="px-6 py-4">목적 (Objective)</th>
-                                            <th className="px-6 py-4 text-center">동작 상태</th>
+                                            <th className="px-4 py-3 whitespace-nowrap">계정 ID</th>
+                                            <th className="px-4 py-3">캠페인명</th>
+                                            <th className="px-4 py-3 text-center whitespace-nowrap">동작 상태</th>
+                                            <th className="px-4 py-3 text-center whitespace-nowrap">예산 소진율(%)</th>
+                                            <th className="px-4 py-3 text-center whitespace-nowrap">예산 소진 상태</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/50">
                                         {liveCampaigns.length === 0 && (
-                                            <tr><td colSpan={4} className="px-6 py-8 text-center text-zinc-500">연결된 라이브 캠페인이 없습니다.</td></tr>
-                                        )}
-                                        {liveCampaigns.map((camp) => (
-                                            <tr key={camp.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 transition-colors">
-                                                <td className="px-6 py-4 font-mono text-zinc-500 text-xs">{camp.account_id?.replace('act_', '')}</td>
-                                                <td className="px-6 py-4">
-                                                    <div className="font-medium text-zinc-900 dark:text-zinc-100">{camp.name}</div>
-                                                    <div className="text-[10px] text-zinc-400 font-mono mt-0.5">{camp.id}</div>
-                                                </td>
-                                                <td className="px-6 py-4 text-zinc-600 dark:text-zinc-400 text-xs">{camp.objective}</td>
-                                                <td className="px-6 py-4 text-center">
-                                                    {camp.effective_status === 'ACTIVE' ? (
-                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400"><CheckCircle2 className="w-3 h-3" /> ACTIVE</span>
-                                                    ) : camp.effective_status === 'PAUSED' ? (
-                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">PAUSED</span>
-                                                    ) : (
-                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-400">{camp.effective_status}</span>
-                                                    )}
+                                            <tr>
+                                                <td colSpan={5} className="px-6 py-8 text-center text-zinc-500">
+                                                    라이브 중인 ACTIVE 캠페인이 없습니다.
                                                 </td>
                                             </tr>
-                                        ))}
+                                        )}
+                                        {liveCampaigns.map((camp) => {
+                                            const burnRate   = calcBurnRate(camp);
+                                            const periodProg = calcPeriodProgress(camp);
+                                            const burnStatus = getBurnStatus(burnRate, periodProg);
+
+                                            return (
+                                                <tr key={camp.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 transition-colors">
+                                                    {/* 계정 ID */}
+                                                    <td className="px-4 py-3 font-mono text-zinc-500 text-xs whitespace-nowrap">
+                                                        {camp.account_id?.replace('act_', '')}
+                                                    </td>
+                                                    {/* 캠페인명 */}
+                                                    <td className="px-4 py-3 max-w-[200px]">
+                                                        <div className="font-medium text-zinc-900 dark:text-zinc-100 truncate" title={camp.name}>
+                                                            {camp.name}
+                                                        </div>
+                                                        <div className="text-[10px] text-zinc-400 font-mono mt-0.5">{camp.id}</div>
+                                                    </td>
+                                                    {/* 동작 상태 */}
+                                                    <td className="px-4 py-3 text-center">
+                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">
+                                                            <CheckCircle2 className="w-3 h-3" /> ACTIVE
+                                                        </span>
+                                                    </td>
+                                                    {/* 예산 소진율 */}
+                                                    <td className="px-4 py-3 text-center">
+                                                        {burnRate !== null ? (
+                                                            <div className="flex flex-col items-center gap-1">
+                                                                <span className="font-semibold text-zinc-800 dark:text-zinc-200 text-sm">
+                                                                    {burnRate.toFixed(1)}%
+                                                                </span>
+                                                                <div className="w-20 h-1.5 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
+                                                                    <div
+                                                                        className={`h-full rounded-full transition-all ${
+                                                                            burnRate > (periodProg ?? 0) + 15
+                                                                                ? 'bg-rose-500'
+                                                                                : burnRate < (periodProg ?? 0) - 15
+                                                                                ? 'bg-yellow-400'
+                                                                                : 'bg-emerald-500'
+                                                                        }`}
+                                                                        style={{ width: `${Math.min(burnRate, 100)}%` }}
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-zinc-400 text-xs">—</span>
+                                                        )}
+                                                    </td>
+                                                    {/* 예산 소진 상태 */}
+                                                    <td className="px-4 py-3 text-center">
+                                                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap ${burnStatus.color}`}>
+                                                            {burnStatus.label}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
                                     </tbody>
                                 </table>
                             </div>
                         </div>
 
+                        {/* ── 최근 실시간 검수 내역 ── */}
                         <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col h-96">
                             <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 flex items-center p-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/40 shrink-0 gap-2">
                                 <Clock className="w-5 h-5 text-indigo-500" /> 최근 실시간 검수 내역
