@@ -142,7 +142,7 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                 }
 
                 // 2. [쿼리 A] Ad group + ad query — Search / Shopping / Display 등 일반 캠페인
-                const adQuery = `SELECT customer.currency_code, campaign.id, campaign.name, campaign.status, campaign.advertising_channel_type, campaign.start_date, campaign.end_date, ad_group.id, ad_group.name, ad_group.status, ad_group_ad.ad.id, ad_group_ad.ad.name, ad_group_ad.status, ad_group_ad.ad.final_urls, ad_group_ad.ad.tracking_url_template FROM ad_group_ad WHERE ad_group_ad.status = 'ENABLED' AND campaign.status = 'ENABLED' AND ad_group.status = 'ENABLED' LIMIT 1000`;
+                const adQuery = `SELECT customer.currency_code, campaign.id, campaign.name, campaign.status, campaign.advertising_channel_type, campaign.bidding_strategy_type, campaign.start_date, campaign.end_date, ad_group.id, ad_group.name, ad_group.status, ad_group_ad.ad.id, ad_group_ad.ad.name, ad_group_ad.status, ad_group_ad.ad.final_urls, ad_group_ad.ad.tracking_url_template FROM ad_group_ad WHERE ad_group_ad.status = 'ENABLED' AND campaign.status = 'ENABLED' AND ad_group.status = 'ENABLED' LIMIT 1000`;
                 const adRes = await fetch(
                     `https://googleads.googleapis.com/v22/customers/${custId}/googleAds:searchStream`,
                     { method: 'POST', headers: gaqlHeaders, body: JSON.stringify({ query: adQuery }) }
@@ -171,6 +171,7 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                                     startDate: camp.startDate,
                                     endDate: camp.endDate,
                                     channelType: camp.advertisingChannelType,
+                                    biddingStrategyType: camp.biddingStrategyType || '',
                                     dailyBudget: Math.round((Number(budget.amountMicros) || 0) / 1000000),
                                     lifetimeBudget: Math.round((Number(budget.totalAmountMicros) || 0) / 1000000),
                                 });
@@ -192,7 +193,7 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                 // 3. [쿼리 B] Campaign 보완 쿼리
                 //    — 쿼리 A에서 수집되지 않은 캠페인(PMax, PAUSED 등)을 campaign 테이블에서 직접 조회
                 const collectedCampaignIds = new Set(campaigns.map((c: any) => String(c.id)));
-                const campaignFallbackQuery = `SELECT customer.currency_code, campaign.id, campaign.name, campaign.status, campaign.advertising_channel_type, campaign.start_date, campaign.end_date FROM campaign WHERE campaign.status IN ('ENABLED', 'PAUSED') LIMIT 500`;
+                const campaignFallbackQuery = `SELECT customer.currency_code, campaign.id, campaign.name, campaign.status, campaign.advertising_channel_type, campaign.bidding_strategy_type, campaign.start_date, campaign.end_date FROM campaign WHERE campaign.status IN ('ENABLED', 'PAUSED') LIMIT 500`;
                 const campaignFallbackRes = await fetch(
                     `https://googleads.googleapis.com/v22/customers/${custId}/googleAds:searchStream`,
                     { method: 'POST', headers: gaqlHeaders, body: JSON.stringify({ query: campaignFallbackQuery }) }
@@ -213,6 +214,7 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                                 startDate: camp.startDate,
                                 endDate: camp.endDate,
                                 channelType: camp.advertisingChannelType,
+                                biddingStrategyType: camp.biddingStrategyType || '',
                                 dailyBudget: Math.round((Number(budget.amountMicros) || 0) / 1000000),
                                 lifetimeBudget: Math.round((Number(budget.totalAmountMicros) || 0) / 1000000),
                             });
@@ -525,6 +527,16 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                         }
                     }
 
+                    // 5-1. Campaign buying type (bidding strategy)
+                    // Google Ads의 구매 유형은 입찰 전략(biddingStrategyType)으로 매핑
+                    // 예: TARGET_CPA, TARGET_ROAS, MAXIMIZE_CONVERSIONS, MAXIMIZE_CLICKS, MANUAL_CPC 등
+                    if (row.CampaignBuyingType && liveCampaign.biddingStrategyType) {
+                        if (normalizeStr(liveCampaign.biddingStrategyType) !== normalizeStr(row.CampaignBuyingType)) {
+                            errors.push(`구매 유형(입찰 전략) 불일치 (기획안: ${row.CampaignBuyingType}, 매체: ${liveCampaign.biddingStrategyType})`);
+                            status = 'FAIL';
+                        }
+                    }
+
                     // 6. Ad group name
                     const liveAdGroup = cache.adGroups.find((ag: any) =>
                         ag.campaignId === liveCampaign.id &&
@@ -557,10 +569,11 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                                 }
                             }
                             // UTM (trackingUrlTemplate)
+                            // tracking_url_template이 비어있으면 Google 자동 태깅(gclid) 사용 가능성 → WARNING 처리
                             if (row.UTMParameters) {
                                 if (!liveAd.trackingUrl) {
-                                    errors.push('매체에 UTM 파라미터(Tracking Template)가 비어있음');
-                                    status = 'FAIL';
+                                    errors.push('매체 Tracking Template이 비어있음 — Google 자동 태깅(Auto-tagging) 사용 가능성 (UTM 검수 제외)');
+                                    if (status === 'PASS') status = 'WARNING';
                                 } else if (!liveAd.trackingUrl.includes(row.UTMParameters) && liveAd.trackingUrl !== row.UTMParameters) {
                                     errors.push(`UTM 파라미터 불일치 (매체: ${liveAd.trackingUrl})`);
                                     status = 'FAIL';
