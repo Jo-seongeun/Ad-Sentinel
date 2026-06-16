@@ -115,19 +115,54 @@ export default async function ActiveDashboardPage() {
                 } catch (e) { console.warn(`[Dashboard] Adset fetch failed:`, e); }
 
                 // ── 3단계: 캠페인 레벨 spend (CBO용) ──
+                // date_preset=lifetime 대신 명시적 time_range 사용 (Meta API async 이슈 회피)
+                // Meta insights API: 최대 37개월 이전까지만 조회 가능 → 36개월 전으로 동적 계산
+                const sinceDate = new Date();
+                sinceDate.setMonth(sinceDate.getMonth() - 36);
+                const insightTimeRange = JSON.stringify({
+                    since: sinceDate.toISOString().slice(0, 10),
+                    until: new Date().toISOString().slice(0, 10),
+                });
                 const campSpendMap: Record<string, number> = {};
                 try {
-                    const p = new URLSearchParams({ level: 'campaign', fields: 'campaign_id,spend', date_preset: 'lifetime', access_token: token });
+                    const p = new URLSearchParams({
+                        level: 'campaign',
+                        fields: 'campaign_id,spend',
+                        time_range: insightTimeRange,
+                        limit: '500',
+                        access_token: token,
+                    });
                     const r = await fetch(`https://graph.facebook.com/v19.0/${actPrefix}/insights?${p}`, { cache: 'no-store' });
-                    if (r.ok) { const j = await r.json(); for (const row of (j.data || [])) campSpendMap[row.campaign_id] = Number(row.spend || 0); }
+                    if (r.ok) {
+                        const j = await r.json();
+                        console.log(`[Dashboard][${actPrefix}] Campaign Insights rows: ${j.data?.length ?? 0}, error: ${j.error?.message ?? 'none'}`);
+                        if (j.data?.[0]) console.log(`[Dashboard] Sample spend row:`, JSON.stringify(j.data[0]));
+                        for (const row of (j.data || [])) campSpendMap[row.campaign_id] = Number(row.spend || 0);
+                    } else {
+                        const errBody = await r.text();
+                        console.error(`[Dashboard] Campaign Insights HTTP ${r.status}:`, errBody.slice(0, 300));
+                    }
                 } catch (e) { console.warn(`[Dashboard] Campaign Insights failed:`, e); }
 
                 // ── 4단계: 광고 세트 레벨 spend (ABO용) ──
                 const adsetSpendMap: Record<string, number> = {};
                 try {
-                    const p = new URLSearchParams({ level: 'adset', fields: 'adset_id,spend', date_preset: 'lifetime', access_token: token });
+                    const p = new URLSearchParams({
+                        level: 'adset',
+                        fields: 'adset_id,spend',
+                        time_range: insightTimeRange,
+                        limit: '500',
+                        access_token: token,
+                    });
                     const r = await fetch(`https://graph.facebook.com/v19.0/${actPrefix}/insights?${p}`, { cache: 'no-store' });
-                    if (r.ok) { const j = await r.json(); for (const row of (j.data || [])) adsetSpendMap[row.adset_id] = Number(row.spend || 0); }
+                    if (r.ok) {
+                        const j = await r.json();
+                        console.log(`[Dashboard][${actPrefix}] Adset Insights rows: ${j.data?.length ?? 0}, error: ${j.error?.message ?? 'none'}`);
+                        for (const row of (j.data || [])) adsetSpendMap[row.adset_id] = Number(row.spend || 0);
+                    } else {
+                        const errBody = await r.text();
+                        console.error(`[Dashboard] Adset Insights HTTP ${r.status}:`, errBody.slice(0, 300));
+                    }
                 } catch (e) { console.warn(`[Dashboard] Adset Insights failed:`, e); }
 
                 // ── 행 생성: CBO → 캠페인 1행 / ABO → 만료 안된 세트별 행 ──
@@ -173,6 +208,150 @@ export default async function ActiveDashboardPage() {
         }
     }
 
+    // ── 6. Google Ads 라이브 캠페인 조회 ──
+    let liveGoogleCampaigns: any[] = [];
+    try {
+        // 6-1. 팀에 매핑된 Google Ads 계정 조회
+        let googleMappingQuery = supabase
+            .from('team_account_map')
+            .select('ad_account_id')
+            .ilike('platform', '%google%');
+        if (!isAdmin) googleMappingQuery = googleMappingQuery.eq('team_id', teamId);
+        const { data: googleMappings } = await googleMappingQuery;
+        const googleAccountIds = googleMappings?.map(m => m.ad_account_id.replace(/[^0-9]/g, '')).filter(Boolean) || [];
+
+        // 6-2. Google Ads API 자격증명 조회
+        const { data: googleSettings } = await supabase
+            .from('platform_settings')
+            .select('app_id, app_secret, refresh_token, access_token')
+            .eq('platform', 'GOOGLE_ADS')
+            .single();
+
+        const devToken = googleSettings?.access_token;
+        const mccId = process.env.GOOGLE_MCC_ID || '';
+
+        // 6-3. OAuth access_token 발급
+        let googleAccessToken: string | null = null;
+        if (googleSettings?.refresh_token) {
+            try {
+                const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams({
+                        client_id: googleSettings.app_id?.trim() || '',
+                        client_secret: googleSettings.app_secret?.trim() || '',
+                        refresh_token: googleSettings.refresh_token?.trim() || '',
+                        grant_type: 'refresh_token',
+                    }).toString(),
+                });
+                const tokenJson = await tokenRes.json();
+                googleAccessToken = tokenJson.access_token || null;
+            } catch (e) {
+                console.error('[Dashboard] Google token error:', e);
+            }
+        }
+
+        if (googleAccessToken && devToken && googleAccountIds.length > 0) {
+            const nowMs = Date.now();
+
+            const gaqlHeaders: Record<string, string> = {
+                'Authorization': `Bearer ${googleAccessToken}`,
+                'developer-token': devToken,
+                'Content-Type': 'application/json',
+            };
+            if (mccId) gaqlHeaders['login-customer-id'] = mccId;
+
+            const calcBurnGoogle = (budgetMicros: number, costMicros: number, startDate: string, endDate: string) => {
+                const budget = budgetMicros / 1_000_000;
+                const spend  = costMicros  / 1_000_000;
+                const burnRate = budget > 0 ? Math.round((spend / budget) * 10000) / 100 : null;
+                let timeProgress: number | null = null;
+                if (startDate && endDate) {
+                    const s = new Date(startDate).getTime();
+                    const e = new Date(endDate).getTime();
+                    if (e > s) timeProgress = Math.min(100, Math.max(0, Math.round(((nowMs - s) / (e - s)) * 100)));
+                }
+                let burnStatus: 'normal' | 'under' | 'over' | 'unknown' = 'unknown';
+                if (burnRate !== null && timeProgress !== null) {
+                    const d = burnRate - timeProgress;
+                    burnStatus = d > 15 ? 'over' : d < -15 ? 'under' : 'normal';
+                }
+                return { burnRate, timeProgress, burnStatus, spend: Math.round(spend) };
+            };
+
+            const googlePromises = googleAccountIds.map(async (custId) => {
+                // GAQL: ENABLED 캠페인 + 예산 + 기간 + 누적 비용
+                const query = `
+                    SELECT
+                        campaign.id,
+                        campaign.name,
+                        campaign.status,
+                        campaign.start_date,
+                        campaign.end_date,
+                        campaign.advertising_channel_type,
+                        campaign_budget.amount_micros,
+                        campaign_budget.total_amount_micros,
+                        metrics.cost_micros
+                    FROM campaign
+                    WHERE campaign.status = 'ENABLED'
+                    LIMIT 500
+                `;
+                try {
+                    const res = await fetch(
+                        `https://googleads.googleapis.com/v22/customers/${custId}/googleAds:searchStream`,
+                        { method: 'POST', headers: gaqlHeaders, body: JSON.stringify({ query }) }
+                    );
+                    if (!res.ok) {
+                        console.error(`[Dashboard] Google Ads API Error for ${custId}: ${res.status}`);
+                        return [];
+                    }
+                    const chunks = await res.json();
+                    if (!Array.isArray(chunks)) return [];
+
+                    const rows: any[] = [];
+                    for (const chunk of chunks) {
+                        for (const r of (chunk.results || [])) {
+                            const camp   = r.campaign || {};
+                            const budget = r.campaignBudget || {};
+                            const metrics = r.metrics || {};
+
+                            // 종료일이 지난 캠페인 제외
+                            if (camp.endDate && new Date(camp.endDate).getTime() < nowMs) continue;
+
+                            // Google Ads: budget은 daily(amount_micros), total은 lifetime(totalAmountMicros)
+                            const budgetMicros = Number(budget.totalAmountMicros || 0) || Number(budget.amountMicros || 0);
+                            const costMicros   = Number(metrics.costMicros || 0);
+                            const { burnRate, timeProgress, burnStatus, spend } = calcBurnGoogle(
+                                budgetMicros, costMicros, camp.startDate, camp.endDate
+                            );
+
+                            rows.push({
+                                rowType: 'campaign',
+                                id: camp.id,
+                                account_id: custId,
+                                name: camp.name,
+                                adsetName: null,
+                                effective_status: 'ENABLED',
+                                channelType: camp.advertisingChannelType,
+                                spend, rawBudget: Math.round(budgetMicros / 1_000_000),
+                                burnRate, timeProgress, burnStatus,
+                            });
+                        }
+                    }
+                    return rows;
+                } catch (e) {
+                    console.error(`[Dashboard] Google Ads fetch error for ${custId}:`, e);
+                    return [];
+                }
+            });
+
+            const googleResults = await Promise.all(googlePromises);
+            liveGoogleCampaigns = googleResults.flat();
+        }
+    } catch (e) {
+        console.error('[Dashboard] Google Ads section error:', e);
+    }
+
     // Mock KPIs
 
     const kpis = [
@@ -186,6 +365,7 @@ export default async function ActiveDashboardPage() {
         <ActiveDashboardClientUI
             kpis={kpis}
             liveCampaigns={liveCampaigns}
+            liveGoogleCampaigns={liveGoogleCampaigns}
             recentAudits={recentAudits || []}
         />
     );

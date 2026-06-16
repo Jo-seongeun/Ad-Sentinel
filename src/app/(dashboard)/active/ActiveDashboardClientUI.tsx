@@ -10,10 +10,12 @@ import { format } from 'date-fns';
 export default function ActiveDashboardClientUI({
     kpis,
     liveCampaigns,
+    liveGoogleCampaigns,
     recentAudits
 }: {
     kpis: any[];
     liveCampaigns: any[];
+    liveGoogleCampaigns: any[];
     recentAudits: any[];
 }) {
     const [activeTab, setActiveTab] = useState<'meta' | 'google'>('meta');
@@ -48,14 +50,95 @@ export default function ActiveDashboardClientUI({
             </div>
 
             {activeTab === 'google' ? (
-                <div className="flex flex-col items-center justify-center p-20 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl text-center">
-                    <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/20 text-blue-500 rounded-2xl flex items-center justify-center mb-4">
-                        <BarChart3 className="w-8 h-8" />
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="lg:col-span-2 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden flex flex-col h-96">
+                        <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/40 shrink-0">
+                            <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                                팀 매핑 라이브 캠페인
+                                <span className="bg-blue-100 text-blue-700 text-[10px] px-2 py-0.5 rounded-full uppercase font-bold tracking-wider">Google</span>
+                                <span className="ml-auto text-xs font-normal text-blue-600 dark:text-blue-400">ENABLED {liveGoogleCampaigns.length}행</span>
+                            </h2>
+                        </div>
+                        <div className="flex-1 overflow-y-auto custom-scrollbar">
+                            <table className="w-full text-sm text-left">
+                                <thead className="text-xs text-zinc-500 dark:text-zinc-400 uppercase bg-zinc-50 dark:bg-zinc-900/60 font-semibold border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-10">
+                                    <tr>
+                                        <th className="px-4 py-4">계정 ID</th>
+                                        <th className="px-4 py-4">캠페인명</th>
+                                        <th className="px-4 py-4 text-center">동작 상태</th>
+                                        <th className="px-4 py-4 text-center">예산 소진율(%)</th>
+                                        <th className="px-4 py-4 text-center">예산 소진 상태</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/50">
+                                    {liveGoogleCampaigns.length === 0 && (
+                                        <tr><td colSpan={5} className="px-6 py-8 text-center text-zinc-500">연결된 ENABLED 캠페인이 없습니다.</td></tr>
+                                    )}
+                                    {liveGoogleCampaigns.map((camp) => {
+                                        const burnBadge = (() => {
+                                            if (camp.burnStatus === 'normal') return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">● 정상</span>;
+                                            if (camp.burnStatus === 'under')  return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">▼ 미소진</span>;
+                                            if (camp.burnStatus === 'over')   return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400">▲ 과소진</span>;
+                                            return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">— 기간 미설정</span>;
+                                        })();
+                                        const burnRateDisplay = (() => {
+                                            if (camp.burnRate === null) return <span className="text-zinc-400 text-xs">예산 미설정</span>;
+                                            const pct = Math.min(camp.burnRate, 100);
+                                            const barColor = camp.burnStatus === 'over' ? 'bg-rose-500' : camp.burnStatus === 'under' ? 'bg-amber-400' : camp.burnStatus === 'normal' ? 'bg-emerald-500' : 'bg-blue-400';
+                                            return (
+                                                <div className="flex flex-col items-center gap-1 w-full min-w-[80px]">
+                                                    <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-200">{camp.burnRate.toFixed(1)}%</span>
+                                                    <div className="w-full h-1.5 bg-zinc-100 dark:bg-zinc-700 rounded-full overflow-hidden">
+                                                        <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
+                                                    </div>
+                                                    {camp.timeProgress !== null && (
+                                                        <span className="text-[9px] text-zinc-400">기간 진행률 {camp.timeProgress}%</span>
+                                                    )}
+                                                </div>
+                                            );
+                                        })();
+                                        return (
+                                            <tr key={`g-${camp.id}`} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 transition-colors">
+                                                <td className="px-4 py-4 font-mono text-zinc-500 text-xs">{camp.account_id}</td>
+                                                <td className="px-4 py-4">
+                                                    <div className="font-medium text-zinc-900 dark:text-zinc-100 text-xs leading-snug line-clamp-2 max-w-[240px]">{camp.name}</div>
+                                                    <div className="text-[10px] text-zinc-400 font-mono mt-0.5">{camp.id}</div>
+                                                </td>
+                                                <td className="px-4 py-4 text-center">
+                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400">
+                                                        <CheckCircle2 className="w-3 h-3" /> ENABLED
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-4 text-center">{burnRateDisplay}</td>
+                                                <td className="px-4 py-4 text-center">{burnBadge}</td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-                    <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">Google Ads 연동 준비 중</h2>
-                    <p className="text-zinc-500 dark:text-zinc-400 mt-2 max-w-sm">
-                        Google Ads API 승인 후 업데이트 예정입니다.
-                    </p>
+                    <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col h-96">
+                        <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 flex items-center p-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/40 shrink-0 gap-2">
+                            <Clock className="w-5 h-5 text-indigo-500" /> 최근 실시간 검수 내역
+                        </h2>
+                        <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                            {recentAudits.length === 0 && (
+                                <div className="text-center text-zinc-500 text-sm mt-10">최근 진행된 검수가 없습니다.</div>
+                            )}
+                            {recentAudits.map(audit => (
+                                <div key={audit.id} className="p-3 rounded-lg border border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/40 hover:border-indigo-200 dark:hover:border-indigo-900 transition-colors">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <span className="text-[10px] text-zinc-400 font-mono">{format(new Date(audit.created_at), 'MM/dd HH:mm')}</span>
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${audit.error_count === 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                                            {audit.error_count === 0 ? 'PASS' : `${audit.error_count} FAIL`}
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-zinc-600 dark:text-zinc-400">총 {audit.total_campaigns}개 검증 완료</p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                 </div>
             ) : (
                 <>
