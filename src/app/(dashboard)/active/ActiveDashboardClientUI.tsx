@@ -85,7 +85,7 @@ export default function ActiveDashboardClientUI({
                                 <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                                     팀 매핑 라이브 캠페인
                                     <span className="bg-indigo-100 text-indigo-700 text-[10px] px-2 py-0.5 rounded-full uppercase font-bold tracking-wider">Live</span>
-                                    <span className="ml-auto text-xs font-normal text-emerald-600 dark:text-emerald-400">ACTIVE {liveCampaigns.length}개</span>
+                                    <span className="ml-auto text-xs font-normal text-emerald-600 dark:text-emerald-400">ACTIVE {liveCampaigns.length}행</span>
                                 </h2>
                             </div>
                             <div className="flex-1 overflow-y-auto custom-scrollbar">
@@ -152,11 +152,21 @@ export default function ActiveDashboardClientUI({
                                             })();
 
                                             return (
-                                                <tr key={camp.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 transition-colors">
+                                                <tr key={camp.rowType === 'adset' ? `adset-${camp.adsetId}` : `camp-${camp.id}`} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 transition-colors">
                                                     <td className="px-4 py-4 font-mono text-zinc-500 text-xs">{camp.account_id?.replace('act_', '')}</td>
                                                     <td className="px-4 py-4">
-                                                        <div className="font-medium text-zinc-900 dark:text-zinc-100 text-xs leading-snug line-clamp-2 max-w-[240px]">{camp.name}</div>
-                                                        <div className="text-[10px] text-zinc-400 font-mono mt-0.5">{camp.id}</div>
+                                                        {camp.rowType === 'adset' ? (
+                                                            <>
+                                                                <div className="text-[10px] text-zinc-400 leading-snug line-clamp-1 max-w-[240px] mb-0.5">{camp.name}</div>
+                                                                <div className="font-medium text-zinc-900 dark:text-zinc-100 text-xs leading-snug line-clamp-2 max-w-[240px]">{camp.adsetName}</div>
+                                                                <div className="text-[10px] text-zinc-400 font-mono mt-0.5">{camp.adsetId}</div>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <div className="font-medium text-zinc-900 dark:text-zinc-100 text-xs leading-snug line-clamp-2 max-w-[240px]">{camp.name}</div>
+                                                                <div className="text-[10px] text-zinc-400 font-mono mt-0.5">{camp.id}</div>
+                                                            </>
+                                                        )}
                                                     </td>
                                                     <td className="px-4 py-4 text-center">
                                                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">

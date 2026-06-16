@@ -53,75 +53,128 @@ export default async function ActiveDashboardPage() {
         .single();
     const token = metaSetting?.access_token;
 
-    // 5. Fetch Live ACTIVE Campaigns from Meta (with budget spend data)
+    // 5. Fetch Live ACTIVE Campaigns from Meta (4단계: 캠페인 → 광고세트 → spend(캠페인) → spend(세트))
     let liveCampaigns: any[] = [];
     if (token && accountIds.length > 0) {
         try {
             const promises = accountIds.map(async (actId) => {
                 const actPrefix = actId.startsWith('act_') ? actId : `act_${actId}`;
-                // insights.date_preset(lifetime){spend} → 캠페인 시작~현재까지 누적 지출
-                const fields = `id,name,objective,effective_status,daily_budget,lifetime_budget,start_time,stop_time,insights.date_preset(lifetime){spend}`;
-                const res = await fetch(
-                    `https://graph.facebook.com/v19.0/${actPrefix}/campaigns?fields=${fields}&limit=100&access_token=${token}`,
-                    { cache: 'no-store' }
-                );
-                if (!res.ok) return [];
-                const json = await res.json();
+                const nowMs = Date.now();
 
-                return (json.data || [])
-                    // 1. ACTIVE 캠페인만 필터링
-                    .filter((c: any) => c.effective_status === 'ACTIVE')
-                    .map((c: any) => {
-                        // 2. 예산 소진율 계산
-                        // Meta API: lifetime/daily_budget은 최소 화폐 단위(KRW는 1원 단위)
-                        // insights.spend는 계정 통화 기준 실제 금액(KRW는 원 단위)
-                        const spend = Number(c.insights?.data?.[0]?.spend || 0);
-                        const rawBudget = Number(c.lifetime_budget || 0) || Number(c.daily_budget || 0);
-                        const burnRate = rawBudget > 0
-                            ? Math.round((spend / rawBudget) * 10000) / 100  // 소수점 2자리 %
-                            : null;
+                // ── 공통 소진율 계산 헬퍼 ──
+                const calcBurn = (budget: number, spend: number, startT: string, stopT: string) => {
+                    const burnRate = budget > 0 ? Math.round((spend / budget) * 10000) / 100 : null;
+                    let timeProgress: number | null = null;
+                    if (startT && stopT) {
+                        const s = new Date(startT).getTime(), e = new Date(stopT).getTime();
+                        if (e > s) timeProgress = Math.min(100, Math.max(0, Math.round(((nowMs - s) / (e - s)) * 100)));
+                    }
+                    let burnStatus: 'normal' | 'under' | 'over' | 'unknown' = 'unknown';
+                    if (burnRate !== null && timeProgress !== null) {
+                        const d = burnRate - timeProgress;
+                        burnStatus = d > 15 ? 'over' : d < -15 ? 'under' : 'normal';
+                    }
+                    return { burnRate, timeProgress, burnStatus };
+                };
 
-                        // 3. 기간 진행률 계산 (start_time ~ stop_time 기준)
-                        let timeProgress: number | null = null;
-                        if (c.start_time && c.stop_time) {
-                            const now = Date.now();
-                            const start = new Date(c.start_time).getTime();
-                            const end   = new Date(c.stop_time).getTime();
-                            if (end > start) {
-                                timeProgress = Math.min(100, Math.max(0,
-                                    Math.round(((now - start) / (end - start)) * 100)
-                                ));
-                            }
-                        }
+                // ── 1단계: 캠페인 기본 정보 ──
+                const campParams = new URLSearchParams({
+                    fields: 'id,name,objective,effective_status,daily_budget,lifetime_budget,start_time,stop_time',
+                    limit: '100',
+                    access_token: token,
+                });
+                const campRes = await fetch(`https://graph.facebook.com/v19.0/${actPrefix}/campaigns?${campParams}`, { cache: 'no-store' });
+                if (!campRes.ok) { console.error(`[Dashboard] Campaign API Error: ${campRes.status}`); return []; }
+                const campJson = await campRes.json();
+                if (campJson.error) { console.error(`[Dashboard] Campaign Error:`, campJson.error); return []; }
 
-                        // 4. 예산 소진 상태 판정 (기간 진행률 ± 15% 오차 기준)
-                        let burnStatus: 'normal' | 'under' | 'over' | 'unknown' = 'unknown';
-                        if (burnRate !== null && timeProgress !== null) {
-                            const diff = burnRate - timeProgress;
-                            if      (diff >  15) burnStatus = 'over';
-                            else if (diff < -15) burnStatus = 'under';
-                            else                 burnStatus = 'normal';
-                        }
+                const activeCampaigns = (campJson.data || []).filter((c: any) => {
+                    if (c.effective_status !== 'ACTIVE') return false;
+                    if (c.stop_time && new Date(c.stop_time).getTime() < nowMs) return false;
+                    return true;
+                });
+                if (activeCampaigns.length === 0) return [];
 
-                        return {
-                            ...c,
-                            account_id:   actId,
-                            spend,
-                            rawBudget,
-                            burnRate,
-                            timeProgress,
-                            burnStatus,
-                        };
+                // ── 2단계: 광고 세트 조회 (name 포함 — ABO 행 생성용) ──
+                const adsetsByCampaign: Record<string, any[]> = {};
+                try {
+                    const adsetParams = new URLSearchParams({
+                        fields: 'id,name,campaign_id,daily_budget,lifetime_budget,start_time,end_time,effective_status',
+                        filtering: JSON.stringify([{ field: 'campaign.effective_status', operator: 'IN', value: ['ACTIVE'] }]),
+                        limit: '500',
+                        access_token: token,
                     });
+                    const adsetRes = await fetch(`https://graph.facebook.com/v19.0/${actPrefix}/adsets?${adsetParams}`, { cache: 'no-store' });
+                    if (adsetRes.ok) {
+                        const adsetJson = await adsetRes.json();
+                        for (const a of (adsetJson.data || [])) {
+                            if (!adsetsByCampaign[a.campaign_id]) adsetsByCampaign[a.campaign_id] = [];
+                            adsetsByCampaign[a.campaign_id].push(a);
+                        }
+                    } else console.warn(`[Dashboard] Adset API skipped: ${adsetRes.status}`);
+                } catch (e) { console.warn(`[Dashboard] Adset fetch failed:`, e); }
+
+                // ── 3단계: 캠페인 레벨 spend (CBO용) ──
+                const campSpendMap: Record<string, number> = {};
+                try {
+                    const p = new URLSearchParams({ level: 'campaign', fields: 'campaign_id,spend', date_preset: 'lifetime', access_token: token });
+                    const r = await fetch(`https://graph.facebook.com/v19.0/${actPrefix}/insights?${p}`, { cache: 'no-store' });
+                    if (r.ok) { const j = await r.json(); for (const row of (j.data || [])) campSpendMap[row.campaign_id] = Number(row.spend || 0); }
+                } catch (e) { console.warn(`[Dashboard] Campaign Insights failed:`, e); }
+
+                // ── 4단계: 광고 세트 레벨 spend (ABO용) ──
+                const adsetSpendMap: Record<string, number> = {};
+                try {
+                    const p = new URLSearchParams({ level: 'adset', fields: 'adset_id,spend', date_preset: 'lifetime', access_token: token });
+                    const r = await fetch(`https://graph.facebook.com/v19.0/${actPrefix}/insights?${p}`, { cache: 'no-store' });
+                    if (r.ok) { const j = await r.json(); for (const row of (j.data || [])) adsetSpendMap[row.adset_id] = Number(row.spend || 0); }
+                } catch (e) { console.warn(`[Dashboard] Adset Insights failed:`, e); }
+
+                // ── 행 생성: CBO → 캠페인 1행 / ABO → 만료 안된 세트별 행 ──
+                const rows: any[] = [];
+                for (const c of activeCampaigns) {
+                    const campBudget = Number(c.lifetime_budget || 0) || Number(c.daily_budget || 0);
+                    const isCBO = campBudget > 0;
+
+                    if (isCBO) {
+                        // CBO: 캠페인 예산·기간·spend 기준
+                        const spend = campSpendMap[c.id] || 0;
+                        const { burnRate, timeProgress, burnStatus } = calcBurn(campBudget, spend, c.start_time, c.stop_time);
+                        rows.push({
+                            rowType: 'campaign', id: c.id, account_id: actId,
+                            name: c.name, adsetName: null, effective_status: c.effective_status,
+                            spend, rawBudget: campBudget, burnRate, timeProgress, burnStatus,
+                        });
+                    } else {
+                        // ABO: 세트별 예산·기간·spend 기준, 만료 세트 제외
+                        const adsets = (adsetsByCampaign[c.id] || []).filter(a => {
+                            if (a.end_time && new Date(a.end_time).getTime() < nowMs) return false;
+                            return true;
+                        });
+                        for (const a of adsets) {
+                            const adsetBudget = Number(a.lifetime_budget || 0) || Number(a.daily_budget || 0);
+                            const spend = adsetSpendMap[a.id] || 0;
+                            const { burnRate, timeProgress, burnStatus } = calcBurn(adsetBudget, spend, a.start_time, a.end_time);
+                            rows.push({
+                                rowType: 'adset', id: c.id, adsetId: a.id, account_id: actId,
+                                name: c.name, adsetName: a.name, effective_status: c.effective_status,
+                                spend, rawBudget: adsetBudget, burnRate, timeProgress, burnStatus,
+                            });
+                        }
+                    }
+                }
+                return rows;
             });
+
             const results = await Promise.all(promises);
             liveCampaigns = results.flat();
         } catch (error) {
-            console.error('Failed to fetch live campaigns', error);
+            console.error('[Dashboard] Failed to fetch live campaigns:', error);
         }
     }
 
     // Mock KPIs
+
     const kpis = [
         { title: '오늘의 총 지출액', value: '₩1,245,000', change: '+12.5%', isPositive: true, icon: 'DollarSign' },
         { title: '총 노출수 (Imp)', value: '842.5K', change: '+5.2%', isPositive: true, icon: 'Users' },
