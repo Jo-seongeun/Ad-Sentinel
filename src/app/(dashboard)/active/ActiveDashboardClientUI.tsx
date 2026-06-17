@@ -26,7 +26,7 @@ export default function ActiveDashboardClientUI({
                 <div className="relative z-10">
                     <h1 className="text-3xl font-bold tracking-tight mb-2">실시간 대시보드</h1>
                     <p className="text-indigo-100 text-lg opacity-90 max-w-2xl">
-                        팀에 매핑된 Meta 광고 계정의 라이브 캠페인과 최근 검수 내역을 한눈에 파악하세요.
+                        팀에 매핑된 Meta 및 Google 광고 계정의 라이브 캠페인과 최근 검수 내역을 한눈에 파악하세요.
                     </p>
                 </div>
                 <div className="absolute right-0 top-0 opacity-10 transform translate-x-1/3 -translate-y-1/4">
