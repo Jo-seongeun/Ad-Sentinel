@@ -1,8 +1,14 @@
 import { createClient } from '@/utils/supabase/server';
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import ActiveDashboardClientUI from './ActiveDashboardClientUI';
 
 export default async function ActiveDashboardPage() {
     const supabase = await createClient();
+
+    const adminSupabase = createSupabaseClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
 
     // 1. Get user team
     const { data: { user } } = await supabase.auth.getUser();
@@ -45,8 +51,8 @@ export default async function ActiveDashboardPage() {
 
     const accountIds = mappings?.map(m => m.ad_account_id) || [];
 
-    // 4. Fetch Meta Token
-    const { data: metaSetting } = await supabase
+    // 4. Fetch Meta Token (adminSupabase 사용: 일반 유저는 platform_settings 조회 권한 없음)
+    const { data: metaSetting } = await adminSupabase
         .from('platform_settings')
         .select('access_token')
         .eq('platform', 'META')
@@ -220,8 +226,8 @@ export default async function ActiveDashboardPage() {
         const { data: googleMappings } = await googleMappingQuery;
         const googleAccountIds = googleMappings?.map(m => m.ad_account_id.replace(/[^0-9]/g, '')).filter(Boolean) || [];
 
-        // 6-2. Google Ads API 자격증명 조회
-        const { data: googleSettings } = await supabase
+        // 6-2. Google Ads API 자격증명 조회 (adminSupabase 사용)
+        const { data: googleSettings } = await adminSupabase
             .from('platform_settings')
             .select('app_id, app_secret, refresh_token, access_token, business_id')
             .eq('platform', 'GOOGLE_ADS')
