@@ -223,12 +223,12 @@ export default async function ActiveDashboardPage() {
         // 6-2. Google Ads API 자격증명 조회
         const { data: googleSettings } = await supabase
             .from('platform_settings')
-            .select('app_id, app_secret, refresh_token, access_token')
+            .select('app_id, app_secret, refresh_token, access_token, business_id')
             .eq('platform', 'GOOGLE_ADS')
             .single();
 
-        const devToken = googleSettings?.access_token;
-        const mccId = process.env.GOOGLE_MCC_ID || '';
+        const devToken = (googleSettings?.access_token || '').trim();
+        const mccId = (googleSettings?.business_id || '').replace(/-/g, '');
 
         // 6-3. OAuth access_token 발급
         let googleAccessToken: string | null = null;
@@ -263,7 +263,7 @@ export default async function ActiveDashboardPage() {
 
             const calcBurnGoogle = (budgetMicros: number, costMicros: number, startDate: string, endDate: string) => {
                 const budget = budgetMicros / 1_000_000;
-                const spend  = costMicros  / 1_000_000;
+                const spend = costMicros / 1_000_000;
                 const burnRate = budget > 0 ? Math.round((spend / budget) * 10000) / 100 : null;
                 let timeProgress: number | null = null;
                 if (startDate && endDate) {
@@ -279,8 +279,7 @@ export default async function ActiveDashboardPage() {
                 return { burnRate, timeProgress, burnStatus, spend: Math.round(spend) };
             };
 
-            const googlePromises = googleAccountIds.map(async (custId) => {
-                // GAQL: ENABLED 캠페인 + 예산 + 기간 + 누적 비용
+            const fetchCampaigns = async (targetId: string): Promise<any[]> => {
                 const query = `
                     SELECT
                         campaign.id,
@@ -298,11 +297,31 @@ export default async function ActiveDashboardPage() {
                 `;
                 try {
                     const res = await fetch(
-                        `https://googleads.googleapis.com/v22/customers/${custId}/googleAds:searchStream`,
+                        `https://googleads.googleapis.com/v22/customers/${targetId}/googleAds:searchStream`,
                         { method: 'POST', headers: gaqlHeaders, body: JSON.stringify({ query }) }
                     );
                     if (!res.ok) {
-                        console.error(`[Dashboard] Google Ads API Error for ${custId}: ${res.status}`);
+                        const errBody = await res.text();
+                        if (errBody.includes('REQUESTED_METRICS_FOR_MANAGER')) {
+                            // MCC 계정인 경우 하위 클라이언트 계정을 자동 조회 후 재시도
+                            const clientQuery = `SELECT customer_client.id FROM customer_client WHERE customer_client.manager = FALSE AND customer_client.status = 'ENABLED'`;
+                            const clientRes = await fetch(
+                                `https://googleads.googleapis.com/v22/customers/${targetId}/googleAds:searchStream`,
+                                { method: 'POST', headers: gaqlHeaders, body: JSON.stringify({ query: clientQuery }) }
+                            );
+                            if (!clientRes.ok) return [];
+                            const clientChunks = await clientRes.json();
+                            const leafIds: string[] = [];
+                            for (const chunk of clientChunks) {
+                                for (const r of (chunk.results || [])) {
+                                    if (r.customerClient?.id) leafIds.push(String(r.customerClient.id));
+                                }
+                            }
+                            const leafPromises = leafIds.map(id => fetchCampaigns(id));
+                            const leafResults = await Promise.all(leafPromises);
+                            return leafResults.flat();
+                        }
+                        console.error(`[Dashboard] Google Ads API Error for ${targetId} (HTTP ${res.status}):\n${errBody}`);
                         return [];
                     }
                     const chunks = await res.json();
@@ -311,16 +330,14 @@ export default async function ActiveDashboardPage() {
                     const rows: any[] = [];
                     for (const chunk of chunks) {
                         for (const r of (chunk.results || [])) {
-                            const camp   = r.campaign || {};
+                            const camp = r.campaign || {};
                             const budget = r.campaignBudget || {};
                             const metrics = r.metrics || {};
 
-                            // 종료일이 지난 캠페인 제외
                             if (camp.endDate && new Date(camp.endDate).getTime() < nowMs) continue;
 
-                            // Google Ads: budget은 daily(amount_micros), total은 lifetime(totalAmountMicros)
                             const budgetMicros = Number(budget.totalAmountMicros || 0) || Number(budget.amountMicros || 0);
-                            const costMicros   = Number(metrics.costMicros || 0);
+                            const costMicros = Number(metrics.costMicros || 0);
                             const { burnRate, timeProgress, burnStatus, spend } = calcBurnGoogle(
                                 budgetMicros, costMicros, camp.startDate, camp.endDate
                             );
@@ -328,7 +345,7 @@ export default async function ActiveDashboardPage() {
                             rows.push({
                                 rowType: 'campaign',
                                 id: camp.id,
-                                account_id: custId,
+                                account_id: targetId,
                                 name: camp.name,
                                 adsetName: null,
                                 effective_status: 'ENABLED',
@@ -340,10 +357,12 @@ export default async function ActiveDashboardPage() {
                     }
                     return rows;
                 } catch (e) {
-                    console.error(`[Dashboard] Google Ads fetch error for ${custId}:`, e);
+                    console.error(`[Dashboard] Google Ads fetch error for ${targetId}:`, e);
                     return [];
                 }
-            });
+            };
+
+            const googlePromises = googleAccountIds.map(custId => fetchCampaigns(custId));
 
             const googleResults = await Promise.all(googlePromises);
             liveGoogleCampaigns = googleResults.flat();
