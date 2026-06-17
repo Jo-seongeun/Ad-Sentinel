@@ -336,7 +336,21 @@ export default async function ActiveDashboardPage() {
 
                             if (camp.endDate && new Date(camp.endDate).getTime() < nowMs) continue;
 
-                            const budgetMicros = Number(budget.totalAmountMicros || 0) || Number(budget.amountMicros || 0);
+                            let budgetMicros = Number(budget.totalAmountMicros || 0);
+                            // 일 예산만 있는 경우(총예산이 0이거나 없을 때), 기간을 곱해 가상 총예산 생성
+                            if (budgetMicros === 0 && budget.amountMicros) {
+                                const dailyMicros = Number(budget.amountMicros);
+                                if (camp.startDate && camp.endDate && camp.endDate !== '2037-12-30') {
+                                    const s = new Date(camp.startDate).getTime();
+                                    const e = new Date(camp.endDate).getTime();
+                                    if (e >= s) {
+                                        // 캠페인 총 운영 일수 (시작일과 종료일 포함)
+                                        const days = Math.floor((e - s) / (1000 * 60 * 60 * 24)) + 1;
+                                        budgetMicros = dailyMicros * days;
+                                    }
+                                }
+                            }
+
                             const costMicros = Number(metrics.costMicros || 0);
                             const { burnRate, timeProgress, burnStatus, spend } = calcBurnGoogle(
                                 budgetMicros, costMicros, camp.startDate, camp.endDate
