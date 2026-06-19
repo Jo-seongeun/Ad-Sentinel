@@ -7,36 +7,117 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 
-export default function ActiveDashboardClientUI({
+    teamId,
+    teamSyncStatus,
     liveCampaigns,
     liveGoogleCampaigns,
     recentAudits
 }: {
+    teamId?: string;
+    teamSyncStatus?: any;
     liveCampaigns: any[];
     liveGoogleCampaigns: any[];
     recentAudits: any[];
 }) {
     const [activeTab, setActiveTab] = useState<'meta' | 'google'>('meta');
+    const [isSyncing, setIsSyncing] = useState(false);
 
-    const targetCampaigns = activeTab === 'google' ? liveGoogleCampaigns : liveCampaigns;
+    const nowMs = Date.now();
+
+    const calcBurn = (budget: number, spend: number, startT: string, stopT: string) => {
+        const burnRate = budget > 0 ? Math.round((spend / budget) * 10000) / 100 : null;
+        let timeProgress: number | null = null;
+        if (startT && stopT) {
+            const s = new Date(startT).getTime(), e = new Date(stopT).getTime();
+            if (e > s) timeProgress = Math.min(100, Math.max(0, Math.round(((nowMs - s) / (e - s)) * 100)));
+        }
+        let burnStatus: 'normal' | 'under' | 'over' | 'unknown' = 'unknown';
+        if (burnRate !== null && timeProgress !== null) {
+            const d = burnRate - timeProgress;
+            burnStatus = d > 15 ? 'over' : d < -15 ? 'under' : 'normal';
+        }
+        return { burnRate, timeProgress, burnStatus };
+    };
+
+    const processedMeta = liveCampaigns.map(c => {
+        const { burnRate, timeProgress, burnStatus } = calcBurn(c.budget, c.spend, c.start_date, c.end_date);
+        return { ...c, burnRate, timeProgress, burnStatus };
+    });
+
+    const processedGoogle = liveGoogleCampaigns.map(c => {
+        const { burnRate, timeProgress, burnStatus } = calcBurn(c.budget, c.spend, c.start_date, c.end_date);
+        return { ...c, burnRate, timeProgress, burnStatus };
+    });
+
+    const targetCampaigns = activeTab === 'google' ? processedGoogle : processedMeta;
+
     const totalCount = targetCampaigns.length;
     const overCount = targetCampaigns.filter(c => c.burnStatus === 'over').length;
     const underCount = targetCampaigns.filter(c => c.burnStatus === 'under').length;
     const normalCount = targetCampaigns.filter(c => c.burnStatus === 'normal').length;
 
+    const handleSync = async () => {
+        if (!teamId) return;
+        setIsSyncing(true);
+        try {
+            const res = await fetch('/api/sync/team', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ teamId })
+            });
+            if (res.ok) {
+                window.location.reload();
+            } else {
+                alert('동기화 중 오류가 발생했습니다.');
+                setIsSyncing(false);
+            }
+        } catch (e) {
+            alert('동기화 중 오류가 발생했습니다.');
+            setIsSyncing(false);
+        }
+    };
+
     return (
         <div className="space-y-6 max-w-7xl animate-in fade-in duration-500 pb-12">
             <div className="relative overflow-hidden bg-gradient-to-r from-indigo-600 to-violet-600 rounded-2xl shadow-lg p-8 text-white">
-                <div className="relative z-10">
-                    <h1 className="text-3xl font-bold tracking-tight mb-2">실시간 대시보드</h1>
-                    <p className="text-indigo-100 text-lg opacity-90 max-w-2xl">
-                        팀에 매핑된 Meta 및 Google 광고 계정의 라이브 캠페인과 최근 검수 내역을 한눈에 파악하세요.
-                    </p>
+                <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <h1 className="text-3xl font-bold tracking-tight mb-2">실시간 대시보드</h1>
+                        <p className="text-indigo-100 text-lg opacity-90 max-w-2xl">
+                            팀에 매핑된 Meta 및 Google 광고 계정의 라이브 캠페인과 최근 검수 내역을 한눈에 파악하세요.
+                        </p>
+                    </div>
+                    {teamId && (
+                        <div className="flex flex-col items-end gap-2 shrink-0">
+                            <button
+                                onClick={handleSync}
+                                disabled={isSyncing}
+                                className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg backdrop-blur-sm transition-all disabled:opacity-50"
+                            >
+                                <svg className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                                <span className="font-semibold text-sm">{isSyncing ? '동기화 중...' : '실시간 동기화'}</span>
+                            </button>
+                            {teamSyncStatus && (
+                                <div className="text-xs text-indigo-200">
+                                    마지막 동기화: {format(new Date(teamSyncStatus.last_synced_at), 'MM월 dd일 HH:mm')}
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
                 <div className="absolute right-0 top-0 opacity-10 transform translate-x-1/3 -translate-y-1/4">
                     <BarChart3 className="w-64 h-64" />
                 </div>
             </div>
+
+            {teamSyncStatus?.sync_status === 'ERROR' && (
+                <div className="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-xl flex items-center gap-3">
+                    <AlertTriangle className="w-5 h-5 shrink-0" />
+                    <p className="text-sm font-medium">⚠️ 현재 토큰 연동 오류로 최근 데이터 동기화가 중단되었습니다.</p>
+                </div>
+            )}
 
             <div className="flex items-center gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-px">
                 <button
@@ -90,7 +171,7 @@ export default function ActiveDashboardClientUI({
                             <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                                 팀 매핑 라이브 캠페인
                                 <span className="bg-blue-100 text-blue-700 text-[10px] px-2 py-0.5 rounded-full uppercase font-bold tracking-wider">Google</span>
-                                <span className="ml-auto text-xs font-normal text-blue-600 dark:text-blue-400">ENABLED {liveGoogleCampaigns.length}행</span>
+                                <span className="ml-auto text-xs font-normal text-blue-600 dark:text-blue-400">ENABLED {processedGoogle.length}행</span>
                             </h2>
                         </div>
                         <div className="flex-1 overflow-y-auto custom-scrollbar">
@@ -105,10 +186,10 @@ export default function ActiveDashboardClientUI({
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/50">
-                                    {liveGoogleCampaigns.length === 0 && (
+                                    {processedGoogle.length === 0 && (
                                         <tr><td colSpan={5} className="px-6 py-8 text-center text-zinc-500">연결된 ENABLED 캠페인이 없습니다.</td></tr>
                                     )}
-                                    {liveGoogleCampaigns.map((camp) => {
+                                    {processedGoogle.map((camp) => {
                                         const burnBadge = (() => {
                                             if (camp.burnStatus === 'normal') return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">● 정상</span>;
                                             if (camp.burnStatus === 'under')  return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">▼ 미소진</span>;
@@ -135,8 +216,8 @@ export default function ActiveDashboardClientUI({
                                             <tr key={`g-${camp.id}`} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 transition-colors">
                                                 <td className="px-4 py-4 font-mono text-zinc-500 text-xs">{camp.account_id}</td>
                                                 <td className="px-4 py-4">
-                                                    <div className="font-medium text-zinc-900 dark:text-zinc-100 text-xs leading-snug line-clamp-2 max-w-[240px]">{camp.name}</div>
-                                                    <div className="text-[10px] text-zinc-400 font-mono mt-0.5">{camp.id}</div>
+                                                    <div className="font-medium text-zinc-900 dark:text-zinc-100 text-xs leading-snug line-clamp-2 max-w-[240px]">{camp.campaign_name}</div>
+                                                    <div className="text-[10px] text-zinc-400 font-mono mt-0.5">{camp.campaign_id}</div>
                                                 </td>
                                                 <td className="px-4 py-4 text-center">
                                                     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400">
@@ -182,7 +263,7 @@ export default function ActiveDashboardClientUI({
                                 <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                                     팀 매핑 라이브 캠페인
                                     <span className="bg-indigo-100 text-indigo-700 text-[10px] px-2 py-0.5 rounded-full uppercase font-bold tracking-wider">Live</span>
-                                    <span className="ml-auto text-xs font-normal text-emerald-600 dark:text-emerald-400">ACTIVE {liveCampaigns.length}행</span>
+                                    <span className="ml-auto text-xs font-normal text-emerald-600 dark:text-emerald-400">ACTIVE {processedMeta.length}행</span>
                                 </h2>
                             </div>
                             <div className="flex-1 overflow-y-auto custom-scrollbar">
@@ -197,10 +278,10 @@ export default function ActiveDashboardClientUI({
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/50">
-                                        {liveCampaigns.length === 0 && (
+                                        {processedMeta.length === 0 && (
                                             <tr><td colSpan={5} className="px-6 py-8 text-center text-zinc-500">연결된 ACTIVE 캠페인이 없습니다.</td></tr>
                                         )}
-                                        {liveCampaigns.map((camp) => {
+                                        {processedMeta.map((camp) => {
                                             // ── 예산 소진 상태 뱃지 ──
                                             const burnBadge = (() => {
                                                 if (camp.burnStatus === 'normal') return (
@@ -249,21 +330,11 @@ export default function ActiveDashboardClientUI({
                                             })();
 
                                             return (
-                                                <tr key={camp.rowType === 'adset' ? `adset-${camp.adsetId}` : `camp-${camp.id}`} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 transition-colors">
+                                                <tr key={`camp-${camp.campaign_id}`} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 transition-colors">
                                                     <td className="px-4 py-4 font-mono text-zinc-500 text-xs">{camp.account_id?.replace('act_', '')}</td>
                                                     <td className="px-4 py-4">
-                                                        {camp.rowType === 'adset' ? (
-                                                            <>
-                                                                <div className="text-[10px] text-zinc-400 leading-snug line-clamp-1 max-w-[240px] mb-0.5">{camp.name}</div>
-                                                                <div className="font-medium text-zinc-900 dark:text-zinc-100 text-xs leading-snug line-clamp-2 max-w-[240px]">{camp.adsetName}</div>
-                                                                <div className="text-[10px] text-zinc-400 font-mono mt-0.5">{camp.adsetId}</div>
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <div className="font-medium text-zinc-900 dark:text-zinc-100 text-xs leading-snug line-clamp-2 max-w-[240px]">{camp.name}</div>
-                                                                <div className="text-[10px] text-zinc-400 font-mono mt-0.5">{camp.id}</div>
-                                                            </>
-                                                        )}
+                                                        <div className="font-medium text-zinc-900 dark:text-zinc-100 text-xs leading-snug line-clamp-2 max-w-[240px]">{camp.campaign_name}</div>
+                                                        <div className="text-[10px] text-zinc-400 font-mono mt-0.5">{camp.campaign_id}</div>
                                                     </td>
                                                     <td className="px-4 py-4 text-center">
                                                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">
