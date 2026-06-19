@@ -8,17 +8,21 @@ import {
 import { format } from 'date-fns';
 
 export default function ActiveDashboardClientUI({
-    kpis,
     liveCampaigns,
     liveGoogleCampaigns,
     recentAudits
 }: {
-    kpis: any[];
     liveCampaigns: any[];
     liveGoogleCampaigns: any[];
     recentAudits: any[];
 }) {
     const [activeTab, setActiveTab] = useState<'meta' | 'google'>('meta');
+
+    const targetCampaigns = activeTab === 'google' ? liveGoogleCampaigns : liveCampaigns;
+    const totalCount = targetCampaigns.length;
+    const overCount = targetCampaigns.filter(c => c.burnStatus === 'over').length;
+    const underCount = targetCampaigns.filter(c => c.burnStatus === 'under').length;
+    const normalCount = targetCampaigns.filter(c => c.burnStatus === 'normal').length;
 
     return (
         <div className="space-y-6 max-w-7xl animate-in fade-in duration-500 pb-12">
@@ -47,6 +51,36 @@ export default function ActiveDashboardClientUI({
                 >
                     Google Ads
                 </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-2">
+                <div className="bg-white dark:bg-zinc-900 rounded-xl p-5 border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col justify-center">
+                    <span className="text-zinc-500 text-xs font-medium mb-2">📊 전체 라이브 캠페인</span>
+                    <div className="text-2xl font-bold text-zinc-900 dark:text-zinc-50 flex items-baseline gap-1">
+                        {totalCount} <span className="text-xs font-normal text-zinc-500">건</span>
+                    </div>
+                </div>
+                <div className="bg-white dark:bg-zinc-900 rounded-xl p-5 border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col justify-center relative overflow-hidden">
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-rose-500"></div>
+                    <span className="text-zinc-500 text-xs font-medium mb-2">🚨 예산 과소진</span>
+                    <div className="text-2xl font-bold text-rose-600 dark:text-rose-400 flex items-baseline gap-1">
+                        {overCount} <span className="text-xs font-normal text-zinc-500">건</span>
+                    </div>
+                </div>
+                <div className="bg-white dark:bg-zinc-900 rounded-xl p-5 border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col justify-center relative overflow-hidden">
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-500"></div>
+                    <span className="text-zinc-500 text-xs font-medium mb-2">⚠️ 예산 미소진</span>
+                    <div className="text-2xl font-bold text-amber-600 dark:text-amber-400 flex items-baseline gap-1">
+                        {underCount} <span className="text-xs font-normal text-zinc-500">건</span>
+                    </div>
+                </div>
+                <div className="bg-white dark:bg-zinc-900 rounded-xl p-5 border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col justify-center relative overflow-hidden">
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500"></div>
+                    <span className="text-zinc-500 text-xs font-medium mb-2">✅ 정상 소진</span>
+                    <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 flex items-baseline gap-1">
+                        {normalCount} <span className="text-xs font-normal text-zinc-500">건</span>
+                    </div>
+                </div>
             </div>
 
             {activeTab === 'google' ? (
@@ -142,26 +176,6 @@ export default function ActiveDashboardClientUI({
                 </div>
             ) : (
                 <>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        {kpis.map((kpi, index) => {
-                            const Icon = kpi.icon === 'DollarSign' ? DollarSign : kpi.icon === 'Users' ? Users : kpi.icon === 'MousePointerClick' ? MousePointerClick : TrendingUp;
-                            return (
-                                <div key={index} className="bg-white dark:bg-zinc-900 rounded-xl p-6 border border-zinc-200 dark:border-zinc-800 shadow-sm relative overflow-hidden group">
-                                    <div className="flex justify-between items-start mb-4">
-                                        <div className="p-2 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 rounded-lg group-hover:scale-110 transition-transform">
-                                            <Icon className="w-6 h-6" />
-                                        </div>
-                                    </div>
-                                    <h3 className="text-zinc-500 dark:text-zinc-400 text-sm font-medium">{kpi.title}</h3>
-                                    <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-50 mt-1">{kpi.value.toLocaleString()}</p>
-                                    <div className="absolute -bottom-4 -right-4 opactity-5 text-indigo-100 dark:text-zinc-800 transform rotate-12 group-hover:rotate-0 transition-transform duration-500 z-0 opacity-10">
-                                        <Icon className="w-24 h-24" />
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         <div className="lg:col-span-2 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden flex flex-col h-96">
                             <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/40 shrink-0">

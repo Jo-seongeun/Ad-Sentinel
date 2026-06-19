@@ -391,18 +391,8 @@ export default async function ActiveDashboardPage() {
         console.error('[Dashboard] Google Ads section error:', e);
     }
 
-    // Mock KPIs
-
-    const kpis = [
-        { title: '오늘의 총 지출액', value: '₩1,245,000', change: '+12.5%', isPositive: true, icon: 'DollarSign' },
-        { title: '총 노출수 (Imp)', value: '842.5K', change: '+5.2%', isPositive: true, icon: 'Users' },
-        { title: '클릭수 (Clicks)', value: '12,405', change: '-1.2%', isPositive: false, icon: 'MousePointerClick' },
-        { title: '실시간 통합 ROAS', value: '342%', change: '+18.4%', isPositive: true, icon: 'TrendingUp' }
-    ];
-
     return (
         <ActiveDashboardClientUI
-            kpis={kpis}
             liveCampaigns={liveCampaigns}
             liveGoogleCampaigns={liveGoogleCampaigns}
             recentAudits={recentAudits || []}
