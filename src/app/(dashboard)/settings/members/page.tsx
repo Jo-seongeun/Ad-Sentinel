@@ -2,6 +2,7 @@ import { createClient } from '@/utils/supabase/server';
 import { Users, Trash2, MailPlus, UserCog } from 'lucide-react';
 import { inviteMemberAction, updateMemberAction, deleteMemberAction } from './actions';
 import DeleteButton from './DeleteButton';
+import MemberListClient from './MemberListClient';
 
 export default async function MembersPage() {
     const supabase = await createClient();
