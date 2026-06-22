@@ -29,16 +29,20 @@ export async function POST(request: Request) {
         }
 
         // 동기화 실행
+        console.log(`[Sync API] Calling syncTeamCampaigns for team ${teamId}...`);
         const result = await syncTeamCampaigns(teamId);
+        console.log(`[Sync API] syncTeamCampaigns result:`, result);
 
         if (!result.success) {
+            console.error(`[Sync API] Returning 500 error:`, result.error);
             return NextResponse.json({ error: result.error }, { status: 500 });
         }
 
+        console.log(`[Sync API] Returning 200 success, count:`, result.count);
         return NextResponse.json({ success: true, count: result.count });
 
     } catch (e: any) {
         console.error('[Sync API] Global error:', e);
-        return NextResponse.json({ success: false, error: e.message }, { status: 500 });
+        return NextResponse.json({ success: false, error: e.message, stack: e.stack }, { status: 500 });
     }
 }

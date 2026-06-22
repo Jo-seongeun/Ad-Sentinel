@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 
+export default function ActiveDashboardClientUI({
     teamId,
     teamSyncStatus,
     liveCampaigns,
@@ -68,11 +69,12 @@ import { format } from 'date-fns';
             if (res.ok) {
                 window.location.reload();
             } else {
-                alert('동기화 중 오류가 발생했습니다.');
+                const text = await res.text();
+                alert(`동기화 실패 (HTTP ${res.status}): ${text}`);
                 setIsSyncing(false);
             }
-        } catch (e) {
-            alert('동기화 중 오류가 발생했습니다.');
+        } catch (e: any) {
+            alert(`동기화 예외 발생: ${e.message}`);
             setIsSyncing(false);
         }
     };
@@ -262,7 +264,7 @@ import { format } from 'date-fns';
                             <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/40 shrink-0">
                                 <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                                     팀 매핑 라이브 캠페인
-                                    <span className="bg-indigo-100 text-indigo-700 text-[10px] px-2 py-0.5 rounded-full uppercase font-bold tracking-wider">Live</span>
+                                    <span className="bg-indigo-100 text-indigo-700 text-[10px] px-2 py-0.5 rounded-full uppercase font-bold tracking-wider">Meta</span>
                                     <span className="ml-auto text-xs font-normal text-emerald-600 dark:text-emerald-400">ACTIVE {processedMeta.length}행</span>
                                 </h2>
                             </div>
