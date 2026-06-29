@@ -14,7 +14,8 @@ import {
     RefreshCw,
     Network,
     FolderGit2,
-    MonitorSmartphone
+    MonitorSmartphone,
+    BookOpen
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
@@ -74,6 +75,7 @@ export default function Sidebar() {
                 { name: '대시보드', href: '/active', icon: LayoutDashboard, roles: ['SUPER_ADMIN', 'ADMIN', 'TEAM_MANAGER', 'MEMBER'] },
                 { name: '실시간 검수 센터', href: '/audit', icon: Activity, roles: ['SUPER_ADMIN', 'ADMIN', 'TEAM_MANAGER', 'MEMBER'] },
                 { name: '검수 히스토리', href: '/history', icon: History, roles: ['SUPER_ADMIN', 'ADMIN', 'TEAM_MANAGER', 'MEMBER'] },
+                { name: '매체 사전', href: '/dictionary', icon: BookOpen, roles: ['SUPER_ADMIN', 'ADMIN', 'TEAM_MANAGER', 'MEMBER'] },
             ]
         },
         {

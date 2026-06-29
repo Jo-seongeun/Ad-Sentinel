@@ -62,11 +62,70 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
         }
     }
 
-    // Group rows by AccountID for efficiency and sanitize to strictly numbers
-    const processedRows = rows.map(r => ({
-        ...r,
-        AccountID: r.AccountID ? r.AccountID.replace(/[^0-9]/g, '') : ''
-    }));
+    // Fetch all ad enum values for mapping
+    const { data: enumValues } = await adminClient
+        .from('ad_enum_values')
+        .select('platform, field_type, api_value, kr_name');
+
+    const getPlatformKey = (p: string): 'META' | 'GOOGLE_ADS' => {
+        const up = p.toUpperCase();
+        if (up.includes('GOOGLE')) return 'GOOGLE_ADS';
+        return 'META';
+    };
+
+    // Mapping dictionary for Excel 한글 ➡️ API 영문
+    const enumMap: Record<string, string> = {};
+    // Mapping dictionary for API 영문 ➡️ 화면 한글
+    const apiToKrMap: Record<string, string> = {};
+
+    if (enumValues) {
+        for (const ev of enumValues) {
+            const platformKey = ev.platform.toUpperCase();
+            const fieldKey = ev.field_type.toLowerCase();
+            const apiVal = ev.api_value.toUpperCase().trim();
+            const krName = ev.kr_name || ev.api_value;
+            const krKey = String(ev.kr_name || '').replace(/\s+/g, '').toLowerCase();
+
+            if (krKey) {
+                enumMap[`${platformKey}_${fieldKey}_${krKey}`] = ev.api_value;
+            }
+            // Map the English API value itself (case-insensitively, spaces removed) to the canonical API value
+            const apiValNormalized = apiVal.replace(/\s+/g, '').toLowerCase();
+            enumMap[`${platformKey}_${fieldKey}_${apiValNormalized}`] = ev.api_value;
+
+            apiToKrMap[`${platformKey}_${fieldKey}_${apiVal}`] = krName;
+        }
+    }
+
+    const translateValue = (val: string, platformKey: string, fieldType: string): string => {
+        if (!val) return '';
+        const trimmedVal = val.trim();
+        const normVal = trimmedVal.replace(/\s+/g, '').toLowerCase();
+        const lookupKey = `${platformKey}_${fieldType}_${normVal}`;
+        if (enumMap[lookupKey]) {
+            return enumMap[lookupKey];
+        }
+        return trimmedVal; // fall back to original (e.g. if already English api_value)
+    };
+
+    const getKrName = (val: string, platformKey: string, fieldType: string): string => {
+        if (!val) return '없음';
+        const key = `${platformKey}_${fieldType}_${val.toUpperCase().trim()}`;
+        return apiToKrMap[key] || val;
+    };
+
+    // Group rows by AccountID for efficiency and sanitize to strictly numbers, translating Korean inputs
+    const processedRows = rows.map(r => {
+        const pKey = getPlatformKey(r.Platform);
+        return {
+            ...r,
+            AccountID: r.AccountID ? r.AccountID.replace(/[^0-9]/g, '') : '',
+            CampaignObjective: translateValue(r.CampaignObjective, pKey, 'objective'),
+            CampaignBuyingType: translateValue(r.CampaignBuyingType, pKey, 'buying_type'),
+            AdSetOptimizationGoal: translateValue(r.AdSetOptimizationGoal, pKey, 'optimization_goal'),
+            AdSetBillingEvent: translateValue(r.AdSetBillingEvent, pKey, 'billing_event'),
+        };
+    });
 
     const accountIds = [...new Set(processedRows.map(r => r.AccountID).filter(Boolean))];
     const liveMetaCache: Record<string, any> = {};
@@ -346,21 +405,29 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
 
                     // Campaign Parameters
                     if (row.CampaignObjective && liveAdSet.campaign?.objective !== row.CampaignObjective) {
-                        errors.push(`캠페인 목적 불일치 (기획안: ${row.CampaignObjective}, 매체: ${liveAdSet.campaign?.objective || '없음'})`);
+                        const excelKr = getKrName(row.CampaignObjective, 'META', 'objective');
+                        const liveKr = getKrName(liveAdSet.campaign?.objective, 'META', 'objective');
+                        errors.push(`캠페인 목적 불일치 (기획안: ${excelKr}, 매체: ${liveKr})`);
                         status = 'FAIL';
                     }
                     if (row.CampaignBuyingType && liveAdSet.campaign?.buying_type !== row.CampaignBuyingType) {
-                        errors.push(`구매 유형 불일치 (기획안: ${row.CampaignBuyingType}, 매체: ${liveAdSet.campaign?.buying_type || '없음'})`);
+                        const excelKr = getKrName(row.CampaignBuyingType, 'META', 'buying_type');
+                        const liveKr = getKrName(liveAdSet.campaign?.buying_type, 'META', 'buying_type');
+                        errors.push(`구매 유형 불일치 (기획안: ${excelKr}, 매체: ${liveKr})`);
                         status = 'FAIL';
                     }
 
                     // Optimization & Billing
                     if (row.AdSetOptimizationGoal && liveAdSet.optimization_goal !== row.AdSetOptimizationGoal) {
-                        errors.push(`최적화 목표 불일치 (기획안: ${row.AdSetOptimizationGoal}, 매체: ${liveAdSet.optimization_goal})`);
+                        const excelKr = getKrName(row.AdSetOptimizationGoal, 'META', 'optimization_goal');
+                        const liveKr = getKrName(liveAdSet.optimization_goal, 'META', 'optimization_goal');
+                        errors.push(`최적화 목표 불일치 (기획안: ${excelKr}, 매체: ${liveKr})`);
                         status = 'FAIL';
                     }
                     if (row.AdSetBillingEvent && liveAdSet.billing_event !== row.AdSetBillingEvent) {
-                        errors.push(`과금 기준 불일치 (기획안: ${row.AdSetBillingEvent}, 매체: ${liveAdSet.billing_event})`);
+                        const excelKr = getKrName(row.AdSetBillingEvent, 'META', 'billing_event');
+                        const liveKr = getKrName(liveAdSet.billing_event, 'META', 'billing_event');
+                        errors.push(`과금 기준 불일치 (기획안: ${excelKr}, 매체: ${liveKr})`);
                         status = 'FAIL';
                     }
 
@@ -522,7 +589,9 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                     // 5. Campaign objective (channel type)
                     if (row.CampaignObjective && liveCampaign.channelType) {
                         if (normalizeStr(liveCampaign.channelType) !== normalizeStr(row.CampaignObjective)) {
-                            errors.push(`캠페인 목적(채널) 불일치 (기획안: ${row.CampaignObjective}, 매체: ${liveCampaign.channelType})`);
+                            const excelKr = getKrName(row.CampaignObjective, 'GOOGLE_ADS', 'objective');
+                            const liveKr = getKrName(liveCampaign.channelType, 'GOOGLE_ADS', 'objective');
+                            errors.push(`캠페인 목적(채널) 불일치 (기획안: ${excelKr}, 매체: ${liveKr})`);
                             status = 'FAIL';
                         }
                     }
@@ -532,7 +601,9 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                     // 예: TARGET_CPA, TARGET_ROAS, MAXIMIZE_CONVERSIONS, MAXIMIZE_CLICKS, MANUAL_CPC 등
                     if (row.CampaignBuyingType && liveCampaign.biddingStrategyType) {
                         if (normalizeStr(liveCampaign.biddingStrategyType) !== normalizeStr(row.CampaignBuyingType)) {
-                            errors.push(`구매 유형(입찰 전략) 불일치 (기획안: ${row.CampaignBuyingType}, 매체: ${liveCampaign.biddingStrategyType})`);
+                            const excelKr = getKrName(row.CampaignBuyingType, 'GOOGLE_ADS', 'buying_type');
+                            const liveKr = getKrName(liveCampaign.biddingStrategyType, 'GOOGLE_ADS', 'buying_type');
+                            errors.push(`구매 유형(입찰 전략) 불일치 (기획안: ${excelKr}, 매체: ${liveKr})`);
                             status = 'FAIL';
                         }
                     }

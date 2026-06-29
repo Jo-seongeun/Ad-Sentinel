@@ -1,9 +1,252 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import * as xlsx from 'xlsx';
-import { UploadCloud, CheckCircle2, AlertCircle, Loader2, Download, ShieldCheck } from 'lucide-react';
+import { UploadCloud, CheckCircle2, AlertCircle, Loader2, Download, ShieldCheck, BookOpen, X, ExternalLink } from 'lucide-react';
 import { crosscheckApiAction } from './actions';
+
+// ─── 22개 컬럼 메타데이터 ───────────────────────────────────────────────────
+type RequiredType = '필수' | '조건부' | '선택';
+
+interface ColumnMeta {
+    no: number;
+    name: string;
+    required: RequiredType;
+    needsDictionary: boolean;
+    description: string;
+}
+
+const COLUMN_META: ColumnMeta[] = [
+    { no: 1,  name: '매체',            required: '필수',   needsDictionary: false, description: 'Meta 또는 Google Ads 입력' },
+    { no: 2,  name: '팀명',            required: '필수',   needsDictionary: false, description: '소속 팀명 (예: 퍼포먼스팀)' },
+    { no: 3,  name: '계정 ID',         required: '필수',   needsDictionary: false, description: '매체 광고 계정 ID (숫자 그대로 입력)' },
+    { no: 4,  name: '캠페인 ID',       required: '선택',   needsDictionary: false, description: '비워두면 캠페인명 기준으로 조회' },
+    { no: 5,  name: '캠페인명',        required: '필수',   needsDictionary: false, description: '실제 매체에 등록된 캠페인 이름' },
+    { no: 6,  name: '통화',            required: '필수',   needsDictionary: false, description: 'ISO 4217 코드 (KRW, USD, JPY 등)' },
+    { no: 7,  name: '캠페인 일 예산',  required: '조건부', needsDictionary: false, description: '캠페인 예산(8번)과 둘 중 하나 필수' },
+    { no: 8,  name: '캠페인 예산',     required: '조건부', needsDictionary: false, description: '캠페인 일 예산(7번)과 둘 중 하나 필수' },
+    { no: 9,  name: '시작일',          required: '필수',   needsDictionary: false, description: 'YYYY-MM-DD 형식 (예: 2024-04-01)' },
+    { no: 10, name: '종료일',          required: '필수',   needsDictionary: false, description: 'YYYY-MM-DD 형식 (예: 2024-04-30)' },
+    { no: 11, name: '광고 세트명',     required: '필수',   needsDictionary: false, description: '실제 매체에 등록된 광고 세트/그룹명' },
+    { no: 12, name: '광고 세트 일 예산', required: '조건부', needsDictionary: false, description: '광고 세트 예산(13번)과 둘 중 하나' },
+    { no: 13, name: '광고 세트 예산',  required: '조건부', needsDictionary: false, description: '광고 세트 일 예산(12번)과 둘 중 하나' },
+    { no: 14, name: '캠페인 목적',     required: '필수',   needsDictionary: true,  description: 'API 코드 또는 한글 기입 (예: 트래픽 / OUTCOME_TRAFFIC)' },
+    { no: 15, name: '구매 유형',       required: '필수',   needsDictionary: true,  description: 'API 코드 또는 한글 기입 (예: 경매 / AUCTION)' },
+    { no: 16, name: '광고명',          required: '선택',   needsDictionary: false, description: '광고 소재명 (없어도 검수 가능)' },
+    { no: 17, name: '랜딩 URL',        required: '선택',   needsDictionary: false, description: '광고 클릭 시 이동되는 랜딩 페이지 URL' },
+    { no: 18, name: 'UTM 파라미터',    required: '선택',   needsDictionary: false, description: 'utm_source=fb&utm_medium=cpa 형식' },
+    { no: 19, name: '최적화 목표',     required: '필수',   needsDictionary: true,  description: 'API 코드 또는 한글 기입 (예: 전환 / CONVERSIONS)' },
+    { no: 20, name: '과금 기준',       required: '필수',   needsDictionary: true,  description: 'API 코드 또는 한글 기입 (예: 노출 / IMPRESSIONS)' },
+    { no: 21, name: '픽셀/이벤트',     required: '선택',   needsDictionary: false, description: '픽셀 ID 또는 이벤트 이름 입력' },
+    { no: 22, name: '이벤트 유형',     required: '선택',   needsDictionary: true,  description: '표준 이벤트명 기입 (예: Purchase, Lead)' },
+];
+
+// ─── 중앙 모달 컴포넌트 ──────────────────────────────────────────────────────
+function TemplateColumnModal({
+    isOpen,
+    onClose,
+    onDownload,
+}: {
+    isOpen: boolean;
+    onClose: () => void;
+    onDownload: () => void;
+}) {
+    // ESC 키로 닫기
+    useEffect(() => {
+        const handleKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') onClose();
+        };
+        if (isOpen) document.addEventListener('keydown', handleKey);
+        return () => document.removeEventListener('keydown', handleKey);
+    }, [isOpen, onClose]);
+
+    const dictColumns = COLUMN_META.filter(c => c.needsDictionary);
+
+    if (!isOpen) return null;
+
+    return (
+        <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            aria-modal="true"
+            role="dialog"
+        >
+            {/* Overlay */}
+            <div
+                className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+                onClick={onClose}
+            />
+
+            {/* Modal Box */}
+            <div className="relative z-10 w-full max-w-3xl max-h-[90vh] bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-zinc-200 dark:border-zinc-800">
+
+                {/* Header */}
+                <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 shrink-0">
+                    <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center text-indigo-600">
+                            <Download className="w-4 h-4" />
+                        </div>
+                        <div>
+                            <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100">템플릿 컬럼 가이드</h2>
+                            <p className="text-xs text-zinc-500 mt-0.5">22개 표준 컬럼 · 필수 여부를 확인하고 바로 다운로드하세요</p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="p-2 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
+                        aria-label="닫기"
+                    >
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
+
+                {/* Dictionary Banner */}
+                <div className="mx-5 mt-4 mb-1 shrink-0 flex items-start gap-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 rounded-xl p-3.5">
+                    <BookOpen className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block" />
+                            매체 사전 확인이 필요한 컬럼이 있습니다
+                        </p>
+                        <p className="text-xs text-amber-700 dark:text-amber-400 mt-1 leading-relaxed">
+                            <span className="font-bold">🔖 사전 참고</span> 표시 컬럼은 입력 가능한 값이 정해져 있습니다. 매체 사전에서 확인 후 작성해 주세요.
+                        </p>
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                            {dictColumns.map(c => (
+                                <span key={c.no} className="inline-flex items-center gap-1 text-[11px] font-semibold bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-700 rounded-full px-2 py-0.5">
+                                    {c.name}
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                    <a
+                        href="/dictionary"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="shrink-0 inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors whitespace-nowrap"
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <BookOpen className="w-3.5 h-3.5" />
+                        매체 사전 열기
+                        <ExternalLink className="w-3 h-3" />
+                    </a>
+                </div>
+
+                {/* Column Table – scrollable area */}
+                <div className="flex-1 overflow-y-auto px-5 pb-2 mt-3 min-h-0">
+                    <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+                        <table className="w-full text-sm text-left border-collapse">
+                            <thead>
+                                <tr className="bg-zinc-100 dark:bg-zinc-800/80 text-xs font-bold text-zinc-500 uppercase tracking-wider">
+                                    <th className="px-3 py-3 w-10 text-center sticky top-0 bg-zinc-100 dark:bg-zinc-800/80">#</th>
+                                    <th className="px-3 py-3 sticky top-0 bg-zinc-100 dark:bg-zinc-800/80">컬럼명</th>
+                                    <th className="px-3 py-3 text-center w-20 sticky top-0 bg-zinc-100 dark:bg-zinc-800/80">필수 여부</th>
+                                    <th className="px-3 py-3 sticky top-0 bg-zinc-100 dark:bg-zinc-800/80">설명</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                                {COLUMN_META.map((col) => (
+                                    <tr
+                                        key={col.no}
+                                        className={`transition-colors ${
+                                            col.needsDictionary
+                                                ? 'bg-amber-50/70 dark:bg-amber-950/20 hover:bg-amber-50 dark:hover:bg-amber-950/30'
+                                                : 'bg-white dark:bg-zinc-900 hover:bg-zinc-50/70 dark:hover:bg-zinc-800/40'
+                                        }`}
+                                    >
+                                        <td className="px-3 py-2.5 text-center text-xs font-mono text-zinc-400">{col.no}</td>
+                                        <td className="px-3 py-2.5">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <span className={`font-semibold text-sm ${col.needsDictionary ? 'text-amber-800 dark:text-amber-300' : 'text-zinc-800 dark:text-zinc-200'}`}>
+                                                    {col.name}
+                                                </span>
+                                                {col.needsDictionary && (
+                                                    <span className="inline-flex items-center gap-0.5 text-[10px] font-bold bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-700 rounded px-1.5 py-0.5">
+                                                        <BookOpen className="w-2.5 h-2.5" />
+                                                        사전 참고
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </td>
+                                        <td className="px-3 py-2.5 text-center">
+                                            {col.required === '필수' && (
+                                                <span className="inline-flex items-center justify-center text-[11px] font-bold px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800">
+                                                    필수
+                                                </span>
+                                            )}
+                                            {col.required === '조건부' && (
+                                                <span className="inline-flex items-center justify-center text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
+                                                    조건부
+                                                </span>
+                                            )}
+                                            {col.required === '선택' && (
+                                                <span className="inline-flex items-center justify-center text-[11px] font-bold px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700">
+                                                    선택
+                                                </span>
+                                            )}
+                                        </td>
+                                        <td className="px-3 py-2.5 text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                                            {col.description}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Legend */}
+                    <div className="mt-3 mb-1 flex flex-wrap gap-3 text-xs text-zinc-500">
+                        <div className="flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-rose-400 inline-block" />
+                            <span><strong className="text-rose-600">필수</strong> — 반드시 입력</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />
+                            <span><strong className="text-amber-600">조건부</strong> — 연관 항목 중 하나 이상 필수</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-zinc-400 inline-block" />
+                            <span><strong className="text-zinc-600 dark:text-zinc-300">선택</strong> — 없어도 검수 가능</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                            <BookOpen className="w-3 h-3 text-amber-500" />
+                            <span><strong className="text-amber-600">사전 참고</strong> — 입력값 범위가 정해진 컬럼</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Footer Actions */}
+                <div className="px-5 py-3.5 border-t border-zinc-200 dark:border-zinc-800 shrink-0 bg-zinc-50/80 dark:bg-zinc-900/60 flex items-center justify-between gap-3">
+                    <a
+                        href="/dictionary"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-sm font-semibold text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 hover:underline transition-colors"
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <BookOpen className="w-4 h-4" />
+                        매체 사전에서 예시값 확인하기
+                        <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={onClose}
+                            className="px-4 py-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700 rounded-lg transition-colors"
+                        >
+                            닫기
+                        </button>
+                        <button
+                            onClick={() => { onDownload(); onClose(); }}
+                            className="px-5 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors flex items-center gap-2 shadow-sm"
+                        >
+                            <Download className="w-4 h-4" />
+                            템플릿 다운로드
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
 
 export interface ParsedRow {
     Platform: string;
@@ -44,10 +287,15 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
     const [isAuditing, setIsAuditing] = useState(false);
     const [results, setResults] = useState<AuditResult[] | null>(null);
     const [isDragOver, setIsDragOver] = useState(false);
+    const [isColumnPanelOpen, setIsColumnPanelOpen] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const downloadTemplate = (e: React.MouseEvent) => {
+    const openColumnPanel = (e: React.MouseEvent) => {
         e.stopPropagation(); // 드래그 앤 드롭 클릭 이벤트 방지
+        setIsColumnPanelOpen(true);
+    };
+
+    const downloadTemplate = () => {
         const headers = [
             '매체', '팀명', '계정 ID',
             '캠페인 ID', '캠페인명', '통화', '캠페인 일 예산', '캠페인 예산', '시작일', '종료일',
@@ -75,6 +323,45 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
 
         // 1. Data Sheet
         const wsData = xlsx.utils.aoa_to_sheet([headers, mockData1, mockData2]);
+
+        // Apply number and date formatting to cells
+        const range = xlsx.utils.decode_range(wsData['!ref'] || 'A1:V3');
+        for (let r = range.s.r; r <= range.e.r; r++) {
+            if (r === 0) continue; // Skip header row
+
+            for (let c = range.s.c; c <= range.e.c; c++) {
+                const cellRef = xlsx.utils.encode_cell({ r, c });
+                const cell = wsData[cellRef];
+                if (!cell) continue;
+
+                // Numeric columns: 캠페인 일 예산 (G/6), 캠페인 예산 (H/7), 광고 세트 일 예산 (L/11), 광고 세트 예산 (M/12)
+                if (c === 6 || c === 7 || c === 11 || c === 12) {
+                    if (cell.v !== '' && cell.v !== null && cell.v !== undefined) {
+                        const numVal = Number(cell.v);
+                        if (!isNaN(numVal)) {
+                            cell.t = 'n';
+                            cell.v = numVal;
+                            cell.z = '#,##0'; // Thousands separator format
+                        }
+                    }
+                }
+
+                // Date columns: 시작일 (I/8), 종료일 (J/9)
+                if (c === 8 || c === 9) {
+                    if (cell.v) {
+                        const dateStr = String(cell.v).trim();
+                        if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+                            // Convert YYYY-MM-DD string to actual Date object
+                            const dateObj = new Date(dateStr + 'T00:00:00');
+                            cell.t = 'd';
+                            cell.v = dateObj;
+                            cell.z = 'yyyy-mm-dd'; // Standard date format in Excel
+                        }
+                    }
+                }
+            }
+        }
+
         xlsx.utils.book_append_sheet(wb, wsData, '미디어믹스_기본양식');
 
         // 2. Reference Sheet (Meta API Data Dictionary)
@@ -282,6 +569,13 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
 
     return (
         <div className="flex-1 overflow-hidden flex flex-col gap-4">
+            {/* 컬럼 안내 모달 */}
+            <TemplateColumnModal
+                isOpen={isColumnPanelOpen}
+                onClose={() => setIsColumnPanelOpen(false)}
+                onDownload={downloadTemplate}
+            />
+
             {rows.length === 0 ? (
                 <div
                     className={`flex-1 border-2 border-dashed rounded-xl flex items-center justify-center flex-col gap-6 transition-all ${isDragOver ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 shadow-inner' : 'border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900/50 hover:bg-zinc-100 dark:hover:bg-zinc-900'}`}
@@ -297,12 +591,12 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
                         </div>
                         <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mt-2">미디어믹스 엑셀 파일 업로드</h3>
                         <p className="text-sm text-zinc-500 max-w-sm mx-auto">
-                            드래그 앤 드롭 하거나 영역을 클릭하여 엑셀(.xlsx) 파일을 업로드해주세요. 양식은 22개의 표준 컬럼을 준수해야 합니다.
+                            드래그 앤 드롭 하거나 영역을 클릭하여 엑셀(.xlsx) 파일을 업로드해주세요.
                         </p>
                     </div>
 
                     <button
-                        onClick={downloadTemplate}
+                        onClick={openColumnPanel}
                         className="mt-2 text-sm font-semibold flex items-center gap-2 px-4 py-2 border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-700 transition"
                     >
                         <Download className="w-4 h-4" />
