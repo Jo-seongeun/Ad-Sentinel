@@ -38,7 +38,7 @@ const COLUMN_META: ColumnMeta[] = [
     { no: 19, name: '최적화 목표',     required: '필수',   needsDictionary: true,  description: 'API 코드 또는 한글 기입 (예: 전환 / CONVERSIONS)' },
     { no: 20, name: '과금 기준',       required: '필수',   needsDictionary: true,  description: 'API 코드 또는 한글 기입 (예: 노출 / IMPRESSIONS)' },
     { no: 21, name: '픽셀/이벤트',     required: '선택',   needsDictionary: false, description: '픽셀 ID 또는 이벤트 이름 입력' },
-    { no: 22, name: '이벤트 유형',     required: '선택',   needsDictionary: true,  description: '표준 이벤트명 기입 (예: Purchase, Lead)' },
+    { no: 22, name: '이벤트 유형',     required: '선택',   needsDictionary: false, description: '표준 이벤트명 또는 사용자 지정 이벤트명 입력' },
 ];
 
 
