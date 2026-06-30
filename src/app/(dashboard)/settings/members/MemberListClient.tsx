@@ -183,12 +183,12 @@ export default function MemberListClient({ members, isAdmin, myUserId, teams }: 
                 <table className="w-full text-left text-sm whitespace-nowrap">
                     <thead className="bg-zinc-50 dark:bg-zinc-900/50 text-zinc-500 dark:text-zinc-400 sticky top-0 border-b border-zinc-200 dark:border-zinc-800 z-10">
                         <tr>
-                            <th className="px-6 py-4 font-medium">이메일</th>
-                            <th className="px-6 py-4 font-medium">사용자 명</th>
-                            <th className="px-6 py-4 font-medium">가입일시</th>
-                            <th className="px-6 py-4 font-medium">역할</th>
-                            <th className="px-6 py-4 font-medium">소속 팀</th>
-                            {isAdmin && <th className="px-6 py-4 font-medium text-right">관리</th>}
+                            <th className="px-3.5 py-3.5 font-medium">이메일</th>
+                            <th className="px-3.5 py-3.5 font-medium">사용자 명</th>
+                            <th className="px-3.5 py-3.5 font-medium">가입일시</th>
+                            <th className="px-3.5 py-3.5 font-medium">역할</th>
+                            <th className="px-3.5 py-3.5 font-medium">소속 팀</th>
+                            {isAdmin && <th className="px-3.5 py-3.5 font-medium text-right">관리</th>}
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800 relative z-0">
@@ -208,28 +208,28 @@ export default function MemberListClient({ members, isAdmin, myUserId, teams }: 
                                             : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50 border-l-transparent'
                                     }`}
                                 >
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-400 flex items-center justify-center text-xs font-semibold">
+                                    <td className="px-3.5 py-3">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-7 h-7 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-400 flex items-center justify-center text-xs font-semibold">
                                                 {currentFullName ? currentFullName.charAt(0) : member.email?.charAt(0).toUpperCase()}
                                             </div>
                                             <span className="font-medium text-zinc-900 dark:text-zinc-100">{member.email}</span>
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 font-medium text-zinc-700 dark:text-zinc-300">
+                                    <td className="px-3.5 py-3 font-medium text-zinc-700 dark:text-zinc-300">
                                         {isAdmin && member.id !== myUserId ? (
-                                            <div className="flex gap-2 items-center">
+                                            <div className="flex gap-1.5 items-center">
                                                 <input 
                                                     type="text" 
                                                     value={currentFullName} 
                                                     placeholder="이름 입력" 
                                                     onChange={(e) => handleFieldChange(member.id, 'fullName', e.target.value, member)}
-                                                    className="p-1.5 text-xs font-medium border rounded bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 outline-none w-28 text-zinc-700 dark:text-zinc-300 focus:border-indigo-500" 
+                                                    className="p-1 text-xs font-medium border rounded bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 outline-none w-20 text-zinc-700 dark:text-zinc-300 focus:border-indigo-500" 
                                                 />
                                                 <button 
                                                     onClick={() => handleSaveSingle(member.id, member)}
                                                     disabled={!isChanged || isSaving}
-                                                    className={`text-xs font-semibold px-2 py-1.5 rounded border transition-colors ${
+                                                    className={`text-xs font-semibold px-1.5 py-1 rounded border transition-colors ${
                                                         isChanged && !isSaving
                                                             ? 'text-amber-700 bg-amber-50 border-amber-200 hover:bg-amber-100 dark:text-amber-400 dark:bg-amber-950/20 dark:border-amber-900/50'
                                                             : 'text-zinc-400 dark:text-zinc-600 bg-zinc-50 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 cursor-not-allowed'
@@ -242,16 +242,16 @@ export default function MemberListClient({ members, isAdmin, myUserId, teams }: 
                                             member.full_name || <span className="text-zinc-400 italic text-xs font-normal">미입력</span>
                                         )}
                                     </td>
-                                    <td className="px-6 py-4 text-zinc-500">
+                                    <td className="px-3.5 py-3 text-zinc-500">
                                         {new Date(member.created_at).toLocaleDateString()}
                                     </td>
-                                    <td className="px-6 py-4">
+                                    <td className="px-3.5 py-3">
                                         {isAdmin && member.id !== myUserId ? (
-                                            <div className="flex gap-2 items-center">
+                                            <div className="flex gap-1.5 items-center">
                                                 <select 
                                                     value={currentRole} 
                                                     onChange={(e) => handleFieldChange(member.id, 'role', e.target.value, member)}
-                                                    className="p-1.5 text-xs font-medium border rounded bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 outline-none text-zinc-700 dark:text-zinc-300 focus:border-indigo-500"
+                                                    className="p-1 text-xs font-medium border rounded bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 outline-none text-zinc-700 dark:text-zinc-300 focus:border-indigo-500"
                                                 >
                                                     <option value="GUEST">GUEST (미승인)</option>
                                                     <option value="MEMBER">MEMBER</option>
@@ -262,7 +262,7 @@ export default function MemberListClient({ members, isAdmin, myUserId, teams }: 
                                                 <button 
                                                     onClick={() => handleSaveSingle(member.id, member)}
                                                     disabled={!isChanged || isSaving}
-                                                    className={`text-xs font-semibold px-2 py-1.5 rounded border transition-colors ${
+                                                    className={`text-xs font-semibold px-1.5 py-1 rounded border transition-colors ${
                                                         isChanged && !isSaving
                                                             ? 'text-amber-700 bg-amber-50 border-amber-200 hover:bg-amber-100 dark:text-amber-400 dark:bg-amber-950/20 dark:border-amber-900/50'
                                                             : 'text-zinc-400 dark:text-zinc-600 bg-zinc-50 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 cursor-not-allowed'
@@ -277,13 +277,13 @@ export default function MemberListClient({ members, isAdmin, myUserId, teams }: 
                                             </span>
                                         )}
                                     </td>
-                                    <td className="px-6 py-4">
+                                    <td className="px-3.5 py-3">
                                         {isAdmin && member.id !== myUserId ? (
-                                            <div className="flex gap-2 items-center">
+                                            <div className="flex gap-1.5 items-center">
                                                 <select 
                                                     value={currentTeamId} 
                                                     onChange={(e) => handleFieldChange(member.id, 'teamId', e.target.value, member)}
-                                                    className="p-1.5 text-xs font-medium border rounded bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 outline-none text-zinc-700 dark:text-zinc-300 focus:border-indigo-500"
+                                                    className="p-1 text-xs font-medium border rounded bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 outline-none text-zinc-700 dark:text-zinc-300 focus:border-indigo-500 max-w-[110px]"
                                                 >
                                                     <option value="">미배정 (소속 없음)</option>
                                                     {teams?.map(t => (
@@ -293,7 +293,7 @@ export default function MemberListClient({ members, isAdmin, myUserId, teams }: 
                                                 <button 
                                                     onClick={() => handleSaveSingle(member.id, member)}
                                                     disabled={!isChanged || isSaving}
-                                                    className={`text-xs font-semibold px-2 py-1.5 rounded border transition-colors ${
+                                                    className={`text-xs font-semibold px-1.5 py-1 rounded border transition-colors ${
                                                         isChanged && !isSaving
                                                             ? 'text-amber-700 bg-amber-50 border-amber-200 hover:bg-amber-100 dark:text-amber-400 dark:bg-amber-950/20 dark:border-amber-900/50'
                                                             : 'text-zinc-400 dark:text-zinc-600 bg-zinc-50 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 cursor-not-allowed'
@@ -309,17 +309,17 @@ export default function MemberListClient({ members, isAdmin, myUserId, teams }: 
                                         )}
                                     </td>
                                     {isAdmin && (
-                                        <td className="px-6 py-4 text-right">
+                                        <td className="px-3.5 py-3 text-right">
                                             {member.id !== myUserId ? (
-                                                <div className="flex items-center justify-end gap-2">
+                                                <div className="flex items-center justify-end gap-1.5">
                                                     <button
                                                         type="button"
                                                         onClick={() => handleResetPassword(member.id, member.email)}
-                                                        className="text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 bg-white hover:bg-zinc-50 dark:bg-zinc-950 dark:hover:bg-zinc-900 transition-colors flex items-center gap-1"
+                                                        className="text-xs font-semibold px-2 py-1 rounded-lg border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 bg-white hover:bg-zinc-50 dark:bg-zinc-950 dark:hover:bg-zinc-900 transition-colors flex items-center gap-1 shrink-0"
                                                     >
-                                                        <span>🔑 비번 재설정</span>
+                                                        <span>🔑 재설정</span>
                                                     </button>
-                                                    <form action={deleteMemberAction}>
+                                                    <form action={deleteMemberAction} className="shrink-0">
                                                         <input type="hidden" name="userId" value={member.id} />
                                                         <DeleteButton />
                                                     </form>
