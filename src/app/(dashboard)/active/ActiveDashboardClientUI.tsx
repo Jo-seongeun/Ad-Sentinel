@@ -21,6 +21,7 @@ export default function ActiveDashboardClientUI({
     recentAudits: any[];
 }) {
     const [activeTab, setActiveTab] = useState<'meta' | 'google'>('meta');
+    const [selectedStatus, setSelectedStatus] = useState<'all' | 'over' | 'under' | 'normal'>('all');
     const [isSyncing, setIsSyncing] = useState(false);
 
     const nowMs = Date.now();
@@ -52,6 +53,11 @@ export default function ActiveDashboardClientUI({
 
     const targetCampaigns = activeTab === 'google' ? processedGoogle : processedMeta;
 
+    const filteredTargetCampaigns = targetCampaigns.filter(c => {
+        if (selectedStatus === 'all') return true;
+        return c.burnStatus === selectedStatus;
+    });
+
     const totalCount = targetCampaigns.length;
     const overCount = targetCampaigns.filter(c => c.burnStatus === 'over').length;
     const underCount = targetCampaigns.filter(c => c.burnStatus === 'under').length;
@@ -77,6 +83,11 @@ export default function ActiveDashboardClientUI({
             alert(`동기화 예외 발생: ${e.message}`);
             setIsSyncing(false);
         }
+    };
+
+    const handleTabChange = (tab: 'meta' | 'google') => {
+        setActiveTab(tab);
+        setSelectedStatus('all');
     };
 
     return (
@@ -123,13 +134,13 @@ export default function ActiveDashboardClientUI({
 
             <div className="flex items-center gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-px">
                 <button
-                    onClick={() => setActiveTab('meta')}
+                    onClick={() => handleTabChange('meta')}
                     className={`px-6 py-3 font-semibold text-sm border-b-2 transition-colors ${activeTab === 'meta' ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400' : 'border-transparent text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}
                 >
                     Meta (Facebook/Instagram)
                 </button>
                 <button
-                    onClick={() => setActiveTab('google')}
+                    onClick={() => handleTabChange('google')}
                     className={`px-6 py-3 font-semibold text-sm border-b-2 transition-colors ${activeTab === 'google' ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400' : 'border-transparent text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}
                 >
                     Google Ads
@@ -137,30 +148,58 @@ export default function ActiveDashboardClientUI({
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-2">
-                <div className="bg-white dark:bg-zinc-900 rounded-xl p-5 border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col justify-center">
+                <div 
+                    onClick={() => setSelectedStatus('all')}
+                    className={`cursor-pointer rounded-xl p-5 border shadow-sm flex flex-col justify-center transition-all hover:-translate-y-1 hover:shadow-md ${
+                        selectedStatus === 'all'
+                            ? 'bg-indigo-50/40 dark:bg-indigo-950/20 border-indigo-500/70 dark:border-indigo-800 ring-2 ring-indigo-500/20'
+                            : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800'
+                    }`}
+                >
                     <span className="text-zinc-500 text-xs font-medium mb-2">📊 전체 라이브 캠페인</span>
                     <div className="text-2xl font-bold text-zinc-900 dark:text-zinc-50 flex items-baseline gap-1">
                         {totalCount} <span className="text-xs font-normal text-zinc-500">건</span>
                     </div>
                 </div>
-                <div className="bg-white dark:bg-zinc-900 rounded-xl p-5 border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col justify-center relative overflow-hidden">
+                <div 
+                    onClick={() => setSelectedStatus('over')}
+                    className={`cursor-pointer rounded-xl p-5 border shadow-sm flex flex-col justify-center relative overflow-hidden transition-all hover:-translate-y-1 hover:shadow-md ${
+                        selectedStatus === 'over'
+                            ? 'bg-rose-50/40 dark:bg-rose-950/20 border-rose-500/70 dark:border-rose-800 ring-2 ring-rose-500/20'
+                            : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800'
+                    }`}
+                >
                     <div className="absolute left-0 top-0 bottom-0 w-1 bg-rose-500"></div>
-                    <span className="text-zinc-500 text-xs font-medium mb-2">🚨 예산 과소진</span>
-                    <div className="text-2xl font-bold text-rose-600 dark:text-rose-400 flex items-baseline gap-1">
+                    <span className="text-zinc-500 text-xs font-medium mb-2 pl-1">🚨 예산 과소진</span>
+                    <div className="text-2xl font-bold text-rose-600 dark:text-rose-400 flex items-baseline gap-1 pl-1">
                         {overCount} <span className="text-xs font-normal text-zinc-500">건</span>
                     </div>
                 </div>
-                <div className="bg-white dark:bg-zinc-900 rounded-xl p-5 border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col justify-center relative overflow-hidden">
+                <div 
+                    onClick={() => setSelectedStatus('under')}
+                    className={`cursor-pointer rounded-xl p-5 border shadow-sm flex flex-col justify-center relative overflow-hidden transition-all hover:-translate-y-1 hover:shadow-md ${
+                        selectedStatus === 'under'
+                            ? 'bg-amber-50/40 dark:bg-amber-950/20 border-amber-500/70 dark:border-amber-800 ring-2 ring-amber-500/20'
+                            : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800'
+                    }`}
+                >
                     <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-500"></div>
-                    <span className="text-zinc-500 text-xs font-medium mb-2">⚠️ 예산 미소진</span>
-                    <div className="text-2xl font-bold text-amber-600 dark:text-amber-400 flex items-baseline gap-1">
+                    <span className="text-zinc-500 text-xs font-medium mb-2 pl-1">⚠️ 예산 미소진</span>
+                    <div className="text-2xl font-bold text-amber-600 dark:text-amber-400 flex items-baseline gap-1 pl-1">
                         {underCount} <span className="text-xs font-normal text-zinc-500">건</span>
                     </div>
                 </div>
-                <div className="bg-white dark:bg-zinc-900 rounded-xl p-5 border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col justify-center relative overflow-hidden">
+                <div 
+                    onClick={() => setSelectedStatus('normal')}
+                    className={`cursor-pointer rounded-xl p-5 border shadow-sm flex flex-col justify-center relative overflow-hidden transition-all hover:-translate-y-1 hover:shadow-md ${
+                        selectedStatus === 'normal'
+                            ? 'bg-emerald-50/40 dark:bg-emerald-950/20 border-emerald-500/70 dark:border-emerald-800 ring-2 ring-emerald-500/20'
+                            : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800'
+                    }`}
+                >
                     <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500"></div>
-                    <span className="text-zinc-500 text-xs font-medium mb-2">✅ 정상 소진</span>
-                    <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 flex items-baseline gap-1">
+                    <span className="text-zinc-500 text-xs font-medium mb-2 pl-1">✅ 정상 소진</span>
+                    <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 flex items-baseline gap-1 pl-1">
                         {normalCount} <span className="text-xs font-normal text-zinc-500">건</span>
                     </div>
                 </div>
@@ -173,7 +212,11 @@ export default function ActiveDashboardClientUI({
                             <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                                 팀 매핑 라이브 캠페인
                                 <span className="bg-blue-100 text-blue-700 text-[10px] px-2 py-0.5 rounded-full uppercase font-bold tracking-wider">Google</span>
-                                <span className="ml-auto text-xs font-normal text-blue-600 dark:text-blue-400">ENABLED {processedGoogle.length}행</span>
+                                {selectedStatus === 'all' && <span className="text-xs font-semibold px-2 py-0.5 bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 rounded">전체</span>}
+                                {selectedStatus === 'over' && <span className="text-xs font-semibold px-2 py-0.5 bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-400 rounded">예산 과소진</span>}
+                                {selectedStatus === 'under' && <span className="text-xs font-semibold px-2 py-0.5 bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400 rounded">예산 미소진</span>}
+                                {selectedStatus === 'normal' && <span className="text-xs font-semibold px-2 py-0.5 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400 rounded">정상 소진</span>}
+                                <span className="ml-auto text-xs font-normal text-blue-600 dark:text-blue-400">ENABLED {filteredTargetCampaigns.length}행 / {processedGoogle.length}행</span>
                             </h2>
                         </div>
                         <div className="flex-1 overflow-y-auto custom-scrollbar">
@@ -188,10 +231,10 @@ export default function ActiveDashboardClientUI({
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/50">
-                                    {processedGoogle.length === 0 && (
-                                        <tr><td colSpan={5} className="px-6 py-8 text-center text-zinc-500">연결된 ENABLED 캠페인이 없습니다.</td></tr>
+                                    {filteredTargetCampaigns.length === 0 && (
+                                        <tr><td colSpan={5} className="px-6 py-8 text-center text-zinc-500">조건에 부합하는 ENABLED 캠페인이 없습니다.</td></tr>
                                     )}
-                                    {processedGoogle.map((camp, idx) => {
+                                    {filteredTargetCampaigns.map((camp, idx) => {
                                         const burnBadge = (() => {
                                             if (camp.burnStatus === 'normal') return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">● 정상</span>;
                                             if (camp.burnStatus === 'under') return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">▼ 미소진</span>;
@@ -265,7 +308,11 @@ export default function ActiveDashboardClientUI({
                                 <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                                     팀 매핑 라이브 캠페인
                                     <span className="bg-indigo-100 text-indigo-700 text-[10px] px-2 py-0.5 rounded-full uppercase font-bold tracking-wider">Meta</span>
-                                    <span className="ml-auto text-xs font-normal text-emerald-600 dark:text-emerald-400">ACTIVE {processedMeta.length}행</span>
+                                    {selectedStatus === 'all' && <span className="text-xs font-semibold px-2 py-0.5 bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 rounded">전체</span>}
+                                    {selectedStatus === 'over' && <span className="text-xs font-semibold px-2 py-0.5 bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-400 rounded">예산 과소진</span>}
+                                    {selectedStatus === 'under' && <span className="text-xs font-semibold px-2 py-0.5 bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400 rounded">예산 미소진</span>}
+                                    {selectedStatus === 'normal' && <span className="text-xs font-semibold px-2 py-0.5 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400 rounded">정상 소진</span>}
+                                    <span className="ml-auto text-xs font-normal text-emerald-600 dark:text-emerald-400">ACTIVE {filteredTargetCampaigns.length}행 / {processedMeta.length}행</span>
                                 </h2>
                             </div>
                             <div className="flex-1 overflow-y-auto custom-scrollbar">
@@ -273,22 +320,22 @@ export default function ActiveDashboardClientUI({
                                     <thead className="text-xs text-zinc-500 dark:text-zinc-400 uppercase bg-zinc-50 dark:bg-zinc-900/60 font-semibold border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-10">
                                         <tr>
                                             <th className="px-4 py-4">계정 ID</th>
-                                            <th className="px-4 py-4">
-                                                <div className="flex flex-col gap-0.5">
-                                                    <span>캠페인명 (*광고세트명)</span>
-                                                    <span className="text-[9px] text-zinc-400 dark:text-zinc-500 font-normal normal-case">*예산 기준이 광고 세트(ABO)인 경우 구분 표시</span>
-                                                </div>
-                                            </th>
-                                            <th className="px-4 py-4 text-center">동작 상태</th>
-                                            <th className="px-4 py-4 text-center">예산 소진율(%)</th>
-                                            <th className="px-4 py-4 text-center">예산 소진 상태</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/50">
-                                        {processedMeta.length === 0 && (
-                                            <tr><td colSpan={5} className="px-6 py-8 text-center text-zinc-500">연결된 ACTIVE 캠페인이 없습니다.</td></tr>
-                                        )}
-                                        {processedMeta.map((camp, idx) => {
+                                                <th className="px-4 py-4">
+                                                    <div className="flex flex-col gap-0.5">
+                                                        <span>캠페인명 (*광고세트명)</span>
+                                                        <span className="text-[9px] text-zinc-400 dark:text-zinc-500 font-normal normal-case">*예산 기준이 광고 세트(ABO)인 경우 구분 표시</span>
+                                                    </div>
+                                                </th>
+                                                <th className="px-4 py-4 text-center">동작 상태</th>
+                                                <th className="px-4 py-4 text-center">예산 소진율(%)</th>
+                                                <th className="px-4 py-4 text-center">예산 소진 상태</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/50">
+                                            {filteredTargetCampaigns.length === 0 && (
+                                                <tr><td colSpan={5} className="px-6 py-8 text-center text-zinc-500">조건에 부합하는 ACTIVE 캠페인이 없습니다.</td></tr>
+                                            )}
+                                            {filteredTargetCampaigns.map((camp, idx) => {
                                             // ── 예산 소진 상태 뱃지 ──
                                             const burnBadge = (() => {
                                                 if (camp.burnStatus === 'normal') return (
