@@ -2,13 +2,40 @@
 
 import { useState } from 'react';
 import { UserCog, Search, Save } from 'lucide-react';
-import { updateMemberAction, updateMembersBulkAction, deleteMemberAction } from './actions';
+import { updateMemberAction, updateMembersBulkAction, deleteMemberAction, resetMemberPasswordAction } from './actions';
 import DeleteButton from './DeleteButton';
 
 export default function MemberListClient({ members, isAdmin, myUserId, teams }: { members: any[], isAdmin: boolean, myUserId: string, teams: any[] }) {
     const [searchTerm, setSearchTerm] = useState('');
     const [edits, setEdits] = useState<{ [userId: string]: { role: string; teamId: string; fullName: string } }>({});
     const [isSaving, setIsSaving] = useState(false);
+
+    const handleResetPassword = async (userId: string, email: string) => {
+        const newPassword = prompt(`[${email}] 사용자의 새로운 비밀번호를 입력해주세요 (최소 6자 이상):`);
+        if (newPassword === null) return; // 취소
+        
+        const pwdTrimmed = newPassword.trim();
+        if (pwdTrimmed.length < 6) {
+            alert('비밀번호는 최소 6자 이상이어야 합니다.');
+            return;
+        }
+
+        if (!confirm(`정말로 [${email}] 사용자의 비밀번호를 변경하시겠습니까?`)) return;
+
+        setIsSaving(true);
+        try {
+            const res = await resetMemberPasswordAction(userId, pwdTrimmed);
+            if (res.success) {
+                alert('비밀번호가 성공적으로 재설정되었습니다.');
+            } else {
+                alert(`비밀번호 재설정 실패: ${res.message || '알 수 없는 오류가 발생했습니다.'}`);
+            }
+        } catch (err: any) {
+            alert(`오류: ${err.message || '네트워크 오류가 발생했습니다.'}`);
+        } finally {
+            setIsSaving(false);
+        }
+    };
 
     const filteredMembers = members?.filter(member => {
         if (!searchTerm) return true;
@@ -284,10 +311,19 @@ export default function MemberListClient({ members, isAdmin, myUserId, teams }: 
                                     {isAdmin && (
                                         <td className="px-6 py-4 text-right">
                                             {member.id !== myUserId ? (
-                                                <form action={deleteMemberAction}>
-                                                    <input type="hidden" name="userId" value={member.id} />
-                                                    <DeleteButton />
-                                                </form>
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleResetPassword(member.id, member.email)}
+                                                        className="text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 bg-white hover:bg-zinc-50 dark:bg-zinc-950 dark:hover:bg-zinc-900 transition-colors flex items-center gap-1"
+                                                    >
+                                                        <span>🔑 비번 재설정</span>
+                                                    </button>
+                                                    <form action={deleteMemberAction}>
+                                                        <input type="hidden" name="userId" value={member.id} />
+                                                        <DeleteButton />
+                                                    </form>
+                                                </div>
                                             ) : (
                                                 <span className="text-xs text-zinc-400 font-medium px-2">(본인)</span>
                                             )}

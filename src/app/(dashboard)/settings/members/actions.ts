@@ -151,3 +151,29 @@ export async function deleteMemberAction(formData: FormData): Promise<void> {
 
     revalidatePath('/settings/members');
 }
+
+export async function resetMemberPasswordAction(targetUserId: string, newPassword: string): Promise<{ success: boolean; message?: string }> {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, message: '로그인이 필요합니다.' };
+
+    const { data: adminData } = await supabase.from('users').select('role').eq('id', user.id).single();
+    if (!adminData || !['SUPER_ADMIN', 'ADMIN'].includes(adminData.role)) {
+        return { success: false, message: '비밀번호 재설정 권한은 관리자에게만 있습니다.' };
+    }
+
+    if (newPassword.length < 6) {
+        return { success: false, message: '비밀번호는 최소 6자 이상이어야 합니다.' };
+    }
+
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(targetUserId, {
+        password: newPassword
+    });
+
+    if (error) {
+        console.error('Password Reset Error:', error);
+        return { success: false, message: error.message || '비밀번호 재설정 중 에러가 발생했습니다.' };
+    }
+
+    return { success: true };
+}
