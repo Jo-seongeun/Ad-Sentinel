@@ -191,7 +191,7 @@ export default function ActiveDashboardClientUI({
                                     {processedGoogle.length === 0 && (
                                         <tr><td colSpan={5} className="px-6 py-8 text-center text-zinc-500">연결된 ENABLED 캠페인이 없습니다.</td></tr>
                                     )}
-                                    {processedGoogle.map((camp) => {
+                                    {processedGoogle.map((camp, idx) => {
                                         const burnBadge = (() => {
                                             if (camp.burnStatus === 'normal') return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">● 정상</span>;
                                             if (camp.burnStatus === 'under')  return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">▼ 미소진</span>;
@@ -215,7 +215,7 @@ export default function ActiveDashboardClientUI({
                                             );
                                         })();
                                         return (
-                                            <tr key={`g-${camp.id}`} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 transition-colors">
+                                            <tr key={`g-${camp.campaign_id || camp.id}-${idx}`} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 transition-colors">
                                                 <td className="px-4 py-4 font-mono text-zinc-500 text-xs">{camp.account_id}</td>
                                                 <td className="px-4 py-4">
                                                     <div className="font-medium text-zinc-900 dark:text-zinc-100 text-xs leading-snug line-clamp-2 max-w-[240px]">{camp.campaign_name}</div>
@@ -283,7 +283,7 @@ export default function ActiveDashboardClientUI({
                                         {processedMeta.length === 0 && (
                                             <tr><td colSpan={5} className="px-6 py-8 text-center text-zinc-500">연결된 ACTIVE 캠페인이 없습니다.</td></tr>
                                         )}
-                                        {processedMeta.map((camp) => {
+                                        {processedMeta.map((camp, idx) => {
                                             // ── 예산 소진 상태 뱃지 ──
                                             const burnBadge = (() => {
                                                 if (camp.burnStatus === 'normal') return (
@@ -332,7 +332,7 @@ export default function ActiveDashboardClientUI({
                                             })();
 
                                             return (
-                                                <tr key={`camp-${camp.campaign_id}`} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 transition-colors">
+                                                <tr key={`camp-${camp.campaign_id || camp.id}-${idx}`} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 transition-colors">
                                                     <td className="px-4 py-4 font-mono text-zinc-500 text-xs">{camp.account_id?.replace('act_', '')}</td>
                                                     <td className="px-4 py-4">
                                                         <div className="font-medium text-zinc-900 dark:text-zinc-100 text-xs leading-snug line-clamp-2 max-w-[240px]">{camp.campaign_name}</div>
