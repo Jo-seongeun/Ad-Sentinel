@@ -58,15 +58,14 @@ export async function inviteMemberAction(formData: FormData): Promise<void> {
     revalidatePath('/settings/members');
 }
 
-export async function updateMemberAction(formData: FormData): Promise<void> {
+export async function updateMemberAction(formData: FormData): Promise<{ success: boolean; message?: string }> {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) return { success: false, message: '로그인이 필요합니다.' };
 
     const { data: adminData } = await supabase.from('users').select('role').eq('id', user.id).single();
     if (!adminData || !['SUPER_ADMIN', 'ADMIN'].includes(adminData.role)) {
-        console.error('이 수정 기능은 관리자만 사용할 수 있습니다.');
-        return;
+        return { success: false, message: '이 수정 기능은 관리자만 사용할 수 있습니다.' };
     }
 
     const targetUserId = formData.get('userId') as string;
@@ -86,10 +85,39 @@ export async function updateMemberAction(formData: FormData): Promise<void> {
     const { error } = await supabaseAdmin.from('users').update(payload).eq('id', targetUserId);
     if (error) {
         console.error('Update Error:', error);
-        return;
+        return { success: false, message: '수정 처리 중 에러가 발생했습니다.' };
     }
 
     revalidatePath('/settings/members');
+    return { success: true };
+}
+
+export async function updateMembersBulkAction(updates: Array<{ userId: string; role: string; teamId: string; fullName: string | null }>): Promise<{ success: boolean; message?: string }> {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, message: '로그인이 필요합니다.' };
+
+    const { data: adminData } = await supabase.from('users').select('role').eq('id', user.id).single();
+    if (!adminData || !['SUPER_ADMIN', 'ADMIN'].includes(adminData.role)) {
+        return { success: false, message: '이 수정 기능은 관리자만 사용할 수 있습니다.' };
+    }
+
+    try {
+        for (const update of updates) {
+            const payload: any = { role: update.role };
+            payload.team_id = update.teamId ? update.teamId : null;
+            if (update.fullName !== null) {
+                payload.full_name = update.fullName.trim() || null;
+            }
+            const { error } = await supabaseAdmin.from('users').update(payload).eq('id', update.userId);
+            if (error) throw error;
+        }
+        revalidatePath('/settings/members');
+        return { success: true };
+    } catch (err: any) {
+        console.error('Bulk Update Error:', err);
+        return { success: false, message: err.message || '일괄 수정 중 오류가 발생했습니다.' };
+    }
 }
 
 export async function deleteMemberAction(formData: FormData): Promise<void> {
