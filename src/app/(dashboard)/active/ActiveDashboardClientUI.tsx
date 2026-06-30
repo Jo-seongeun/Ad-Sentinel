@@ -194,8 +194,8 @@ export default function ActiveDashboardClientUI({
                                     {processedGoogle.map((camp, idx) => {
                                         const burnBadge = (() => {
                                             if (camp.burnStatus === 'normal') return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">● 정상</span>;
-                                            if (camp.burnStatus === 'under')  return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">▼ 미소진</span>;
-                                            if (camp.burnStatus === 'over')   return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400">▲ 과소진</span>;
+                                            if (camp.burnStatus === 'under') return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">▼ 미소진</span>;
+                                            if (camp.burnStatus === 'over') return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400">▲ 과소진</span>;
                                             return <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">— 기간 미설정</span>;
                                         })();
                                         const burnRateDisplay = (() => {
@@ -273,7 +273,12 @@ export default function ActiveDashboardClientUI({
                                     <thead className="text-xs text-zinc-500 dark:text-zinc-400 uppercase bg-zinc-50 dark:bg-zinc-900/60 font-semibold border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-10">
                                         <tr>
                                             <th className="px-4 py-4">계정 ID</th>
-                                            <th className="px-4 py-4">캠페인명</th>
+                                            <th className="px-4 py-4">
+                                                <div className="flex flex-col gap-0.5">
+                                                    <span>캠페인명 (*광고세트명)</span>
+                                                    <span className="text-[9px] text-zinc-400 dark:text-zinc-500 font-normal normal-case">*예산 기준이 광고 세트(ABO)인 경우 구분 표시</span>
+                                                </div>
+                                            </th>
                                             <th className="px-4 py-4 text-center">동작 상태</th>
                                             <th className="px-4 py-4 text-center">예산 소진율(%)</th>
                                             <th className="px-4 py-4 text-center">예산 소진 상태</th>
@@ -314,10 +319,10 @@ export default function ActiveDashboardClientUI({
                                                 if (camp.burnRate === null) return <span className="text-zinc-400 text-xs">예산 미설정</span>;
                                                 const pct = Math.min(camp.burnRate, 100);
                                                 const barColor =
-                                                    camp.burnStatus === 'over'   ? 'bg-rose-500' :
-                                                    camp.burnStatus === 'under'  ? 'bg-amber-400' :
-                                                    camp.burnStatus === 'normal' ? 'bg-emerald-500' :
-                                                    'bg-indigo-400';
+                                                    camp.burnStatus === 'over' ? 'bg-rose-500' :
+                                                        camp.burnStatus === 'under' ? 'bg-amber-400' :
+                                                            camp.burnStatus === 'normal' ? 'bg-emerald-500' :
+                                                                'bg-indigo-400';
                                                 return (
                                                     <div className="flex flex-col items-center gap-1 w-full min-w-[80px]">
                                                         <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-200">{camp.burnRate.toFixed(1)}%</span>
