@@ -1,10 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
-    Lock, Clock, Activity, DollarSign, CheckCircle2, AlertTriangle, BarChart3,
-    UploadCloud, BookOpen, ShieldCheck, ArrowUpRight, ArrowDownRight, RefreshCw,
-    Info, Loader2, Sparkles, AlertCircle, FileText, Check, Play, RotateCcw, X, Eye, ToggleLeft, Layers
+    Lock, Clock, Activity, BarChart3, UploadCloud, BookOpen, Sparkles, RefreshCw,
+    Loader2, FileText, RotateCcw, X, Eye, Info, AlertCircle, CheckCircle2, Play
 } from 'lucide-react';
 
 type RequiredType = '필수' | '조건부' | '선택';
@@ -55,7 +54,6 @@ const MOCK_META_CAMPAIGNS = [
     { id: '120249891184899999', name: 'HQ-MS-Seeding_MS_TV_DE_26_Q3_HSAD_OLED-G6-Carousel_lg.com_awareness_facebook', account: '1267556304705160', budget: 1000000, spend: 885000, start: '2026-07-01', stop: '2026-07-31', burnRate: 88.5, timeProgress: 41, burnStatus: 'over' },
 ];
 
-// Rich ver2 Mock Audit Results
 interface AuditDetail {
     excel: string;
     api: string;
@@ -77,7 +75,6 @@ interface MockAuditResult {
     campaignName: string;
     adName: string;
     status: 'PASS' | 'FAIL' | 'WARNING';
-    // ver2 parameters
     campaignBudget: AuditDetail;
     startDate: AuditDetail;
     headline: AuditDetail;
@@ -148,13 +145,8 @@ export default function SampleDashboardPage() {
     const [auditState, setAuditState] = useState<'upload' | 'loading' | 'results'>('upload');
     const [loadingProgress, setLoadingProgress] = useState(0);
     const [loadingLog, setLoadingLog] = useState('');
-
-    // UI Option Design Selection States (For User Review)
-    const [selectedDesignOption, setSelectedDesignOption] = useState<'A' | 'B'>('A');
     const [activeDrawerRow, setActiveDrawerRow] = useState<MockAuditResult | null>(null);
-    const [optionBToggleMode, setOptionBToggleMode] = useState<'simple' | 'detail'>('simple');
 
-    // Handlers
     const triggerSyncDemo = () => {
         setIsSyncing(true);
         setTimeout(() => {
@@ -185,8 +177,6 @@ export default function SampleDashboardPage() {
                 clearInterval(interval);
                 setTimeout(() => {
                     setAuditState('results');
-                    // Automatically open first drawer for Option A demonstration to make it obvious
-                    setActiveDrawerRow(MOCK_AUDIT_RESULTS[1]);
                 }, 600);
             }
         }, 600);
@@ -226,13 +216,21 @@ export default function SampleDashboardPage() {
                         현재 미승인 권한 상태입니다. 관리자가 소속 팀과 매체 조회 권한을 배정해 주시면, 실제 연동된 미디어믹스 및 실시간 계정 데이터로 전체 서비스를 이용하실 수 있습니다.
                     </p>
                 </div>
-                <div className="shrink-0 flex items-center gap-2 bg-white dark:bg-zinc-900 px-4 py-2 border border-zinc-200 dark:border-zinc-800 rounded-xl text-xs font-semibold text-zinc-500 dark:text-zinc-400">
-                    <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
-                    체험관 가동 중
+                <div className="shrink-0 flex items-center gap-3">
+                    <a 
+                        href="/sample/compare" 
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 dark:bg-indigo-950/40 dark:hover:bg-indigo-900/40 dark:text-indigo-400 rounded-xl text-xs font-bold transition-all border border-indigo-100 dark:border-indigo-900/50"
+                    >
+                        📐 UI 설계안 비교 검토
+                    </a>
+                    <div className="flex items-center gap-2 bg-white dark:bg-zinc-900 px-4 py-2 border border-zinc-200 dark:border-zinc-800 rounded-xl text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+                        <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+                        체험관 가동 중
+                    </div>
                 </div>
             </div>
 
-            {/* 🌟 Tab Selector (體驗館) */}
+            {/* Tab Selector */}
             <div className="space-y-4">
                 <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-2">
                     <div>
@@ -269,9 +267,7 @@ export default function SampleDashboardPage() {
                 </div>
             </div>
 
-            {/* ──────────────────────────────────────────────────────── */}
             {/* Tab 1: 실시간 대시보드 미리보기 */}
-            {/* ──────────────────────────────────────────────────────── */}
             {previewTab === 'dashboard' && (
                 <div className="space-y-6 max-w-7xl border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 bg-white dark:bg-zinc-900/50 shadow-sm animate-in fade-in duration-300">
                     <div className="flex items-center gap-2 text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
@@ -279,7 +275,6 @@ export default function SampleDashboardPage() {
                         대시보드 미리보기 모드 (정적 데모)
                     </div>
 
-                    {/* Gradient Header Banner */}
                     <div className="relative overflow-hidden bg-gradient-to-r from-indigo-600 to-violet-600 rounded-2xl shadow-lg p-6 text-white">
                         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
                             <div>
@@ -309,7 +304,6 @@ export default function SampleDashboardPage() {
                         </div>
                     </div>
 
-                    {/* Media Tabs */}
                     <div className="flex items-center gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-px">
                         <button
                             onClick={() => { setDashboardMedia('meta'); setBurnFilter('all'); }}
@@ -325,7 +319,6 @@ export default function SampleDashboardPage() {
                         </button>
                     </div>
 
-                    {/* Summary Cards */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                         <div 
                             onClick={() => setBurnFilter('all')}
@@ -384,9 +377,7 @@ export default function SampleDashboardPage() {
                         </div>
                     </div>
 
-                    {/* Table & Audits Grid */}
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        {/* Live Campaigns Table */}
                         <div className="lg:col-span-2 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden flex flex-col h-96">
                             <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/40 flex justify-between items-center shrink-0">
                                 <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
@@ -452,7 +443,6 @@ export default function SampleDashboardPage() {
                             </div>
                         </div>
 
-                        {/* Recent Audits List */}
                         <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col h-96">
                             <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 flex items-center p-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/40 shrink-0 gap-2">
                                 <Clock className="w-4 h-4 text-indigo-500" /> 최근 실시간 검수 내역
@@ -492,9 +482,7 @@ export default function SampleDashboardPage() {
                 </div>
             )}
 
-            {/* ──────────────────────────────────────────────────────── */}
             {/* Tab 2: 실시간 검수 센터 미리보기 */}
-            {/* ──────────────────────────────────────────────────────── */}
             {previewTab === 'audit' && (
                 <div className="space-y-6 max-w-7xl border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 bg-white dark:bg-zinc-900/50 shadow-sm animate-in fade-in duration-300">
                     <div className="flex items-center gap-2 text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
@@ -502,7 +490,6 @@ export default function SampleDashboardPage() {
                         검수 센터 미리보기 모드 (정적 데모)
                     </div>
 
-                    {/* Standard Audit Title */}
                     <div className="pb-4 border-b border-zinc-200 dark:border-zinc-800">
                         <h1 className="text-2xl font-bold text-zinc-950 dark:text-zinc-50 flex items-center gap-2">
                             <Activity className="w-6 h-6 text-indigo-500" />
@@ -515,7 +502,6 @@ export default function SampleDashboardPage() {
 
                     {auditState === 'upload' && (
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                            {/* Left Side: Upload Card */}
                             <div className="lg:col-span-1 flex flex-col gap-4">
                                 <div className="border-2 border-dashed border-zinc-300 dark:border-zinc-700 rounded-2xl p-8 bg-zinc-50/50 dark:bg-zinc-900/40 text-center flex flex-col items-center justify-center min-h-[300px] transition-all hover:border-indigo-400 dark:hover:border-indigo-900">
                                     <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded-full flex items-center justify-center mb-4">
@@ -540,7 +526,6 @@ export default function SampleDashboardPage() {
                                 </button>
                             </div>
 
-                            {/* Right Side: Column Guide Table */}
                             <div className="lg:col-span-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm overflow-hidden flex flex-col h-[400px]">
                                 <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/40 flex items-center justify-between shrink-0">
                                     <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
@@ -584,7 +569,6 @@ export default function SampleDashboardPage() {
                         </div>
                     )}
 
-                    {/* Loader during simulation */}
                     {auditState === 'loading' && (
                         <div className="min-h-[350px] border border-zinc-200 dark:border-zinc-800 rounded-2xl flex flex-col items-center justify-center bg-zinc-50/30 dark:bg-zinc-900/30 p-8 animate-in fade-in">
                             <Loader2 className="w-10 h-10 text-indigo-500 animate-spin mb-4" />
@@ -603,48 +587,8 @@ export default function SampleDashboardPage() {
                         </div>
                     )}
 
-                    {/* Audit Results View containing interactive Options A & B */}
                     {auditState === 'results' && (
                         <div className="space-y-6 animate-in fade-in duration-300">
-                            
-                            {/* 💡 UI Design Option Selector Banner */}
-                            <div className="bg-gradient-to-r from-slate-900 to-indigo-950 text-white rounded-2xl p-5 shadow-md flex flex-col md:flex-row items-center justify-between gap-4 border border-indigo-950">
-                                <div className="space-y-1">
-                                    <div className="flex items-center gap-2">
-                                        <Sparkles className="w-5 h-5 text-indigo-400" />
-                                        <h3 className="text-sm font-bold">💡 검수 결과 UI 설계안 비교 체험관</h3>
-                                    </div>
-                                    <p className="text-xs text-slate-300">
-                                        다중 URL 및 소재 상세 검수 정보(ver2)를 어떻게 보여줄지 두 가지 대안을 골라 직접 사용해보세요.
-                                    </p>
-                                </div>
-                                <div className="flex items-center gap-2 bg-slate-800/80 p-1.5 rounded-xl border border-slate-700/60 shadow-inner shrink-0">
-                                    <button
-                                        onClick={() => { setSelectedDesignOption('A'); setActiveDrawerRow(MOCK_AUDIT_RESULTS[1]); }}
-                                        className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                                            selectedDesignOption === 'A'
-                                                ? 'bg-indigo-600 text-white shadow-sm'
-                                                : 'text-slate-400 hover:text-slate-200'
-                                        }`}
-                                    >
-                                        <Layers className="w-3.5 h-3.5" />
-                                        대안 A (우측 Drawer)
-                                    </button>
-                                    <button
-                                        onClick={() => { setSelectedDesignOption('B'); setActiveDrawerRow(null); }}
-                                        className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                                            selectedDesignOption === 'B'
-                                                ? 'bg-indigo-600 text-white shadow-sm'
-                                                : 'text-slate-400 hover:text-slate-200'
-                                        }`}
-                                    >
-                                        <ToggleLeft className="w-3.5 h-3.5" />
-                                        대안 B (간편/상세 토글)
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Summary Card */}
                             <div className="bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
                                 <div className="flex items-center gap-3">
                                     <div className="w-10 h-10 bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 rounded-full flex items-center justify-center flex-shrink-0">
@@ -664,229 +608,74 @@ export default function SampleDashboardPage() {
                                 </button>
                             </div>
 
-                            {/* ──────────────────────────────────────────────────────── */}
-                            {/* RENDERING: 대안 A (점진적 공개 - Drawer 방식) */}
-                            {/* ──────────────────────────────────────────────────────── */}
-                            {selectedDesignOption === 'A' && (
-                                <div className="space-y-4">
-                                    <div className="p-4 bg-indigo-50/50 dark:bg-indigo-950/10 border border-indigo-100 dark:border-indigo-900/30 rounded-xl text-xs text-indigo-700 dark:text-indigo-400 leading-relaxed flex items-start gap-2">
-                                        <Info className="w-4 h-4 shrink-0 mt-0.5" />
-                                        <div>
-                                            <span className="font-bold">대안 A (Drawer 방식)의 이점:</span> 메인 테이블은 ver1(기본형)처럼 가독성을 극대화하여 컴팩트하게 노출하고, 복잡한 다중 지면 URL 대조나 소재 상세 카피 비교는 광고 행을 클릭했을 때 우측에서 열리는 <strong>상세 검수 슬라이드 패널(Drawer)</strong>에서 독립적으로 검수합니다. 
-                                            <p className="mt-1 font-semibold text-indigo-800 dark:text-indigo-300">💡 표에서 아래 광고 행을 클릭하여 우측 상세 패널을 직접 열어보세요.</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm overflow-hidden">
-                                        <table className="w-full text-xs text-left">
-                                            <thead className="text-[10px] text-zinc-500 uppercase bg-zinc-50 dark:bg-zinc-900/60 font-semibold border-b border-zinc-200 dark:border-zinc-800">
-                                                <tr>
-                                                    <th className="px-4 py-3 text-center w-12">#</th>
-                                                    <th className="px-4 py-3 w-20">매체</th>
-                                                    <th className="px-4 py-3 w-56">캠페인명</th>
-                                                    <th className="px-4 py-3 w-40">광고 소재명</th>
-                                                    <th className="px-4 py-3 text-center w-24">상태</th>
-                                                    <th className="px-4 py-3 text-center w-24">액션</th>
+                            <div className="space-y-4">
+                                <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm overflow-hidden">
+                                    <table className="w-full text-xs text-left">
+                                        <thead className="text-[10px] text-zinc-500 uppercase bg-zinc-50 dark:bg-zinc-900/60 font-semibold border-b border-zinc-200 dark:border-zinc-800">
+                                            <tr>
+                                                <th className="px-4 py-3 text-center w-12">#</th>
+                                                <th className="px-4 py-3 w-20">매체</th>
+                                                <th className="px-4 py-3 w-56">캠페인명</th>
+                                                <th className="px-4 py-3 w-40">광고 소재명</th>
+                                                <th className="px-4 py-3 text-center w-24">상태</th>
+                                                <th className="px-4 py-3 text-center w-24">액션</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/50">
+                                            {MOCK_AUDIT_RESULTS.map((row) => (
+                                                <tr 
+                                                    key={row.id} 
+                                                    onClick={() => setActiveDrawerRow(row)}
+                                                    className={`hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 transition-all cursor-pointer ${
+                                                        activeDrawerRow?.id === row.id 
+                                                            ? 'bg-indigo-50/20 dark:bg-indigo-950/10 border-l-4 border-l-indigo-600' 
+                                                            : ''
+                                                    }`}
+                                                >
+                                                    <td className="px-4 py-3 text-center font-mono text-zinc-400">{row.id}</td>
+                                                    <td className="px-4 py-3 font-semibold">{row.platform}</td>
+                                                    <td className="px-4 py-3 font-medium text-zinc-800 dark:text-zinc-200 truncate max-w-[220px]">{row.campaignName}</td>
+                                                    <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">{row.adName}</td>
+                                                    <td className="px-4 py-3 text-center">
+                                                        <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                                                            row.status === 'PASS' 
+                                                                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' 
+                                                                : row.status === 'FAIL'
+                                                                    ? 'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400'
+                                                                    : 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400'
+                                                        }`}>
+                                                            {row.status === 'PASS' ? '일치' : row.status === 'FAIL' ? '불일치' : '경고'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-center">
+                                                        <button 
+                                                            onClick={(e) => { e.stopPropagation(); setActiveDrawerRow(row); }}
+                                                            className="inline-flex items-center gap-1 py-1 px-2.5 bg-zinc-100 hover:bg-indigo-50 hover:text-indigo-600 dark:bg-zinc-800 dark:hover:bg-indigo-950/30 text-zinc-700 dark:text-zinc-300 rounded font-bold transition-all text-[10px]"
+                                                        >
+                                                            <Eye className="w-3 h-3" /> 상세 보기
+                                                        </button>
+                                                    </td>
                                                 </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/50">
-                                                {MOCK_AUDIT_RESULTS.map((row) => (
-                                                    <tr 
-                                                        key={row.id} 
-                                                        onClick={() => setActiveDrawerRow(row)}
-                                                        className={`hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 transition-all cursor-pointer ${
-                                                            activeDrawerRow?.id === row.id 
-                                                                ? 'bg-indigo-50/20 dark:bg-indigo-950/10 border-l-4 border-l-indigo-600' 
-                                                                : ''
-                                                        }`}
-                                                    >
-                                                        <td className="px-4 py-3 text-center font-mono text-zinc-400">{row.id}</td>
-                                                        <td className="px-4 py-3 font-semibold">{row.platform}</td>
-                                                        <td className="px-4 py-3 font-medium text-zinc-800 dark:text-zinc-200 truncate max-w-[220px]">{row.campaignName}</td>
-                                                        <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">{row.adName}</td>
-                                                        <td className="px-4 py-3 text-center">
-                                                            <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                                                                row.status === 'PASS' 
-                                                                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' 
-                                                                    : row.status === 'FAIL'
-                                                                        ? 'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400'
-                                                                        : 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400'
-                                                            }`}>
-                                                                {row.status === 'PASS' ? '일치' : row.status === 'FAIL' ? '불일치' : '경고'}
-                                                            </span>
-                                                        </td>
-                                                        <td className="px-4 py-3 text-center">
-                                                            <button 
-                                                                onClick={(e) => { e.stopPropagation(); setActiveDrawerRow(row); }}
-                                                                className="inline-flex items-center gap-1 py-1 px-2.5 bg-zinc-100 hover:bg-indigo-50 hover:text-indigo-600 dark:bg-zinc-800 dark:hover:bg-indigo-950/30 text-zinc-700 dark:text-zinc-300 rounded font-bold transition-all text-[10px]"
-                                                            >
-                                                                <Eye className="w-3 h-3" /> 상세 보기
-                                                            </button>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
+                                            ))}
+                                        </tbody>
+                                    </table>
                                 </div>
-                            )}
-
-                            {/* ──────────────────────────────────────────────────────── */}
-                            {/* RENDERING: 대안 B (간편/상세 뷰 토글 방식) */}
-                            {/* ──────────────────────────────────────────────────────── */}
-                            {selectedDesignOption === 'B' && (
-                                <div className="space-y-4">
-                                    <div className="p-4 bg-amber-50/50 dark:bg-amber-950/10 border border-amber-100 dark:border-amber-900/30 rounded-xl text-xs text-amber-800 dark:text-amber-400 leading-relaxed flex items-start gap-2">
-                                        <Info className="w-4 h-4 shrink-0 mt-0.5" />
-                                        <div>
-                                            <span className="font-bold">대안 B (간편/상세 토글)의 특징:</span> 우측 상단의 토글 스위치로 테이블에 보여줄 정보 범위를 선택합니다. 
-                                            <strong className="text-rose-600 dark:text-rose-400"> '상세 소재 검수 뷰'</strong>를 켜면 테이블에 본문, 헤드라인, CTA, 지면별 다중 URL 등 ver2의 모든 컬럼이 가로로 대량 추가되어 스크롤이 넓어집니다. 
-                                            소규모 검수에선 한눈에 볼 수 있어 좋으나, 대용량 데이터 검수 시에는 가로 크기가 비대해집니다.
-                                        </div>
-                                    </div>
-
-                                    {/* View Toggle Controller */}
-                                    <div className="flex justify-end items-center gap-2">
-                                        <span className="text-xs font-semibold text-zinc-500">뷰 모드 설정:</span>
-                                        <div className="flex bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-lg border border-zinc-200 dark:border-zinc-700">
-                                            <button
-                                                onClick={() => setOptionBToggleMode('simple')}
-                                                className={`px-3 py-1 text-[11px] font-bold rounded-md transition-all ${
-                                                    optionBToggleMode === 'simple'
-                                                        ? 'bg-white dark:bg-zinc-700 text-zinc-800 dark:text-zinc-100 shadow-sm'
-                                                        : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
-                                                }`}
-                                            >
-                                                간편 검수 뷰 (ver1)
-                                            </button>
-                                            <button
-                                                onClick={() => setOptionBToggleMode('detail')}
-                                                className={`px-3 py-1 text-[11px] font-bold rounded-md transition-all ${
-                                                    optionBToggleMode === 'detail'
-                                                        ? 'bg-white dark:bg-zinc-700 text-zinc-800 dark:text-zinc-100 shadow-sm'
-                                                        : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
-                                                }`}
-                                            >
-                                                상세 소재 검수 뷰 (ver2)
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm overflow-x-auto custom-scrollbar">
-                                        <table className="w-full text-xs text-left min-w-[800px]">
-                                            <thead className="text-[10px] text-zinc-500 uppercase bg-zinc-50 dark:bg-zinc-900/60 font-semibold border-b border-zinc-200 dark:border-zinc-800">
-                                                <tr>
-                                                    <th className="px-4 py-3 text-center w-12 sticky left-0 bg-zinc-50 dark:bg-zinc-900/60">#</th>
-                                                    <th className="px-4 py-3 w-20 sticky left-12 bg-zinc-50 dark:bg-zinc-900/60">매체</th>
-                                                    <th className="px-4 py-3 w-48">캠페인명</th>
-                                                    <th className="px-4 py-3 w-32">광고 소재명</th>
-                                                    
-                                                    {/* Extra ver2 columns activated conditionally */}
-                                                    {optionBToggleMode === 'detail' && (
-                                                        <>
-                                                            <th className="px-4 py-3 w-48">헤드라인 대조 (계획 vs API)</th>
-                                                            <th className="px-4 py-3 w-48">본문 카피 대조 (계획 vs API)</th>
-                                                            <th className="px-4 py-3 w-36">행동유도(CTA) 버튼</th>
-                                                            <th className="px-4 py-3 w-64">지면별 맞춤 URL 매핑 결과</th>
-                                                        </>
-                                                    )}
-
-                                                    <th className="px-4 py-3 text-center w-24">상태</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/50">
-                                                {MOCK_AUDIT_RESULTS.map((row) => (
-                                                    <tr key={row.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 transition-colors">
-                                                        <td className="px-4 py-3 text-center font-mono text-zinc-400 sticky left-0 bg-white dark:bg-zinc-900">{row.id}</td>
-                                                        <td className="px-4 py-3 font-semibold sticky left-12 bg-white dark:bg-zinc-900">{row.platform}</td>
-                                                        <td className="px-4 py-3 font-medium text-zinc-800 dark:text-zinc-200 truncate max-w-[180px]">{row.campaignName}</td>
-                                                        <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">{row.adName}</td>
-                                                        
-                                                        {optionBToggleMode === 'detail' && (
-                                                            <>
-                                                                <td className="px-4 py-3">
-                                                                    <div className={`p-1.5 rounded text-[10px] ${row.headline.status === 'FAIL' ? 'bg-rose-50 text-rose-800 dark:bg-rose-950/20 dark:text-rose-400 border border-rose-200' : 'bg-zinc-50 dark:bg-zinc-800/40 text-zinc-600 dark:text-zinc-300'}`}>
-                                                                        <div>계획: {row.headline.excel}</div>
-                                                                        <div className="mt-0.5">실체: {row.headline.api}</div>
-                                                                        {row.headline.status === 'FAIL' && <span className="text-[8px] font-bold block mt-1 text-rose-600 dark:text-rose-400">❌ {row.headline.message}</span>}
-                                                                    </div>
-                                                                </td>
-                                                                <td className="px-4 py-3 max-w-[200px]">
-                                                                    <div className="p-1.5 rounded text-[10px] bg-zinc-50 dark:bg-zinc-800/40 text-zinc-600 dark:text-zinc-300 truncate" title={`계획: ${row.body.excel}\n실체: ${row.body.api}`}>
-                                                                        <div>계획: {row.body.excel}</div>
-                                                                        <div className="mt-0.5">실체: {row.body.api}</div>
-                                                                    </div>
-                                                                </td>
-                                                                <td className="px-4 py-3">
-                                                                    <div className={`p-1.5 rounded text-[10px] ${row.cta.status === 'FAIL' ? 'bg-rose-50 text-rose-800 dark:bg-rose-950/20 dark:text-rose-400 border border-rose-200' : 'bg-zinc-50 dark:bg-zinc-800/40 text-zinc-600 dark:text-zinc-300'}`}>
-                                                                        <div>계획: {row.cta.excel}</div>
-                                                                        <div className="mt-0.5">실체: {row.cta.api}</div>
-                                                                    </div>
-                                                                </td>
-                                                                <td className="px-4 py-3">
-                                                                    <div className="space-y-1.5 max-h-24 overflow-y-auto custom-scrollbar">
-                                                                        {row.placementUrls.map((pUrl, pIdx) => (
-                                                                            <div key={pIdx} className={`p-1 rounded text-[9px] leading-tight ${
-                                                                                pUrl.status === 'FAIL'
-                                                                                    ? 'bg-rose-50 dark:bg-rose-950/20 text-rose-800 dark:text-rose-400 border border-rose-100'
-                                                                                    : 'bg-emerald-50 dark:bg-emerald-950/10 text-emerald-800 dark:text-emerald-400'
-                                                                            }`}>
-                                                                                <div className="font-bold flex justify-between">
-                                                                                    <span>[{pUrl.placement}]</span>
-                                                                                    <span>{pUrl.status === 'PASS' ? '✅ 일치' : '❌ 오류'}</span>
-                                                                                </div>
-                                                                                <div className="truncate mt-0.5" title={`계획: ${pUrl.excel}\n실제: ${pUrl.api}`}>
-                                                                                    URL: {pUrl.excel}
-                                                                                </div>
-                                                                                {pUrl.status === 'FAIL' && (
-                                                                                    <div className="font-semibold text-[8px] mt-0.5 text-rose-600 dark:text-rose-400">{pUrl.message}</div>
-                                                                                )}
-                                                                            </div>
-                                                                        ))}
-                                                                    </div>
-                                                                </td>
-                                                            </>
-                                                        )}
-
-                                                        <td className="px-4 py-3 text-center">
-                                                            <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                                                                row.status === 'PASS' 
-                                                                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' 
-                                                                    : row.status === 'FAIL'
-                                                                        ? 'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400'
-                                                                        : 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400'
-                                                            }`}>
-                                                                {row.status === 'PASS' ? '일치' : row.status === 'FAIL' ? '불일치' : '경고'}
-                                                            </span>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            )}
+                            </div>
                         </div>
                     )}
                 </div>
             )}
 
-            {/* ──────────────────────────────────────────────────────── */}
-            {/* OPTION A: Slide-out Right Drawer Overlay (Interactive) */}
-            {/* ──────────────────────────────────────────────────────── */}
-            {previewTab === 'audit' && auditState === 'results' && selectedDesignOption === 'A' && activeDrawerRow && (
+            {/* Slide-out Right Drawer Overlay */}
+            {previewTab === 'audit' && auditState === 'results' && activeDrawerRow && (
                 <>
-                    {/* Drawer Backdrop */}
                     <div 
                         className="fixed inset-0 bg-black/40 backdrop-blur-xs z-40 transition-opacity animate-in fade-in"
                         onClick={() => setActiveDrawerRow(null)}
                     ></div>
                     
-                    {/* Drawer Container */}
                     <div className="fixed inset-y-0 right-0 z-50 w-full sm:w-[480px] bg-white dark:bg-zinc-950 border-l border-zinc-200 dark:border-zinc-800 shadow-2xl p-6 overflow-y-auto flex flex-col justify-between transition-all duration-300 animate-in slide-in-from-right">
-                        
                         <div className="space-y-6">
-                            {/* Drawer Header */}
                             <div className="flex items-start justify-between pb-4 border-b border-zinc-200 dark:border-zinc-800">
                                 <div>
                                     <div className="flex items-center gap-1.5 text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 px-2 py-0.5 rounded-full w-fit">
@@ -907,10 +696,9 @@ export default function SampleDashboardPage() {
                                 </button>
                             </div>
 
-                            {/* Section 1: Budget and Dates (Basic) */}
+                            {/* Section 1: Budget and Dates */}
                             <div className="space-y-3">
                                 <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wider">1. 캠페인 기본 설정 대조</h3>
-                                
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className={`p-3 rounded-xl border text-xs ${
                                         activeDrawerRow.campaignBudget.status === 'FAIL' 
@@ -935,12 +723,10 @@ export default function SampleDashboardPage() {
                                 </div>
                             </div>
 
-                            {/* Section 2: Creative Copy (Ver2 Details) */}
+                            {/* Section 2: Creative Copy */}
                             <div className="space-y-3">
                                 <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wider">2. 광고 소재 카피 대조</h3>
-                                
                                 <div className="space-y-3">
-                                    {/* Headline */}
                                     <div className={`p-3.5 rounded-xl border text-xs space-y-1 ${
                                         activeDrawerRow.headline.status === 'FAIL' 
                                             ? 'bg-rose-50/40 dark:bg-rose-950/10 border-rose-200 dark:border-rose-900/30' 
@@ -956,7 +742,6 @@ export default function SampleDashboardPage() {
                                         )}
                                     </div>
 
-                                    {/* Body Text */}
                                     <div className="p-3.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/30 text-xs space-y-1">
                                         <span className="text-[10px] text-zinc-400 block font-semibold">📝 기본 본문 카피</span>
                                         <div className="font-semibold text-zinc-800 dark:text-zinc-200 leading-relaxed">계획: {activeDrawerRow.body.excel}</div>
@@ -964,7 +749,6 @@ export default function SampleDashboardPage() {
                                         <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 block mt-1">✅ 정상 일치</span>
                                     </div>
 
-                                    {/* CTA Button */}
                                     <div className={`p-3.5 rounded-xl border text-xs space-y-1 ${
                                         activeDrawerRow.cta.status === 'FAIL' 
                                             ? 'bg-rose-50/40 dark:bg-rose-950/10 border-rose-200 dark:border-rose-900/30' 
@@ -982,12 +766,11 @@ export default function SampleDashboardPage() {
                                 </div>
                             </div>
 
-                            {/* Section 3: Placement Specific URLs (PAC/Advantage+) */}
+                            {/* Section 3: Placement Specific URLs */}
                             <div className="space-y-3">
                                 <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1.5">
                                     🔗 3. 노출 지면별 맞춤 URL & UTM 검수
                                 </h3>
-                                
                                 <div className="space-y-2">
                                     {activeDrawerRow.placementUrls.map((pUrl, pIdx) => (
                                         <div 
@@ -1031,7 +814,6 @@ export default function SampleDashboardPage() {
                             </div>
                         </div>
 
-                        {/* Drawer Footer */}
                         <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800 shrink-0 mt-6">
                             <button
                                 onClick={() => setActiveDrawerRow(null)}

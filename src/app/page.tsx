@@ -7,7 +7,15 @@ export default async function RootPage() {
 
     if (!user) {
         redirect('/login');
+    }
+
+    const { data } = await supabase.from('users').select('role').eq('id', user.id).single();
+    const role = data?.role || 'GUEST';
+
+    if (role === 'GUEST') {
+        redirect('/sample');
     } else {
         redirect('/active');
     }
 }
+
