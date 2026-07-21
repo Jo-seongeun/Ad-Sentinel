@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import * as xlsx from 'xlsx';
-import { UploadCloud, CheckCircle2, AlertCircle, Loader2, Download, ShieldCheck, BookOpen, X, ExternalLink } from 'lucide-react';
+import { UploadCloud, CheckCircle2, AlertCircle, Loader2, Download, ShieldCheck, BookOpen, X, ExternalLink, Map } from 'lucide-react';
 import { crosscheckApiAction } from './actions';
 
 // ─── 22개 컬럼 메타데이터 ───────────────────────────────────────────────────
@@ -17,28 +17,31 @@ interface ColumnMeta {
 }
 
 const COLUMN_META: ColumnMeta[] = [
-    { no: 1,  name: '매체',            required: '필수',   needsDictionary: false, description: 'Meta 또는 Google Ads 입력' },
-    { no: 2,  name: '팀명',            required: '필수',   needsDictionary: false, description: '소속 팀명 (예: 퍼포먼스팀)' },
-    { no: 3,  name: '계정 ID',         required: '필수',   needsDictionary: false, description: '매체 광고 계정 ID (숫자 그대로 입력)' },
-    { no: 4,  name: '캠페인 ID',       required: '선택',   needsDictionary: false, description: '비워두면 캠페인명 기준으로 조회' },
-    { no: 5,  name: '캠페인명',        required: '필수',   needsDictionary: false, description: '실제 매체에 등록된 캠페인 이름' },
-    { no: 6,  name: '통화',            required: '필수',   needsDictionary: false, description: 'ISO 4217 코드 (KRW, USD, JPY 등)' },
-    { no: 7,  name: '캠페인 일 예산',  required: '조건부', needsDictionary: false, description: '캠페인 예산(8번)과 둘 중 하나 필수' },
-    { no: 8,  name: '캠페인 예산',     required: '조건부', needsDictionary: false, description: '캠페인 일 예산(7번)과 둘 중 하나 필수' },
-    { no: 9,  name: '시작일',          required: '필수',   needsDictionary: false, description: 'YYYY-MM-DD 형식 (예: 2024-04-01)' },
-    { no: 10, name: '종료일',          required: '필수',   needsDictionary: false, description: 'YYYY-MM-DD 형식 (예: 2024-04-30)' },
-    { no: 11, name: '광고 세트명',     required: '필수',   needsDictionary: false, description: '실제 매체에 등록된 광고 세트/그룹명' },
+    { no: 1,  name: '매체',              required: '필수',   needsDictionary: false, description: 'Meta 또는 Google Ads 입력' },
+    { no: 2,  name: '팀명',              required: '필수',   needsDictionary: false, description: '소속 팀명 (예: 퍼포먼스팀)' },
+    { no: 3,  name: '계정 ID',           required: '필수',   needsDictionary: false, description: '매체 광고 계정 ID (숫자 그대로 입력)' },
+    { no: 4,  name: '캠페인 ID',         required: '선택',   needsDictionary: false, description: '비워두면 캠페인명 기준으로 조회' },
+    { no: 5,  name: '캠페인명',          required: '필수',   needsDictionary: false, description: '실제 매체에 등록된 캠페인 이름' },
+    { no: 6,  name: '통화',              required: '필수',   needsDictionary: false, description: 'ISO 4217 코드 (KRW, USD, JPY 등)' },
+    { no: 7,  name: '캠페인 일 예산',    required: '조건부', needsDictionary: false, description: '캠페인 예산(8번)과 둘 중 하나 필수' },
+    { no: 8,  name: '캠페인 예산',       required: '조건부', needsDictionary: false, description: '캠페인 일 예산(7번)과 둘 중 하나 필수' },
+    { no: 9,  name: '시작일',            required: '필수',   needsDictionary: false, description: 'YYYY-MM-DD 형식 (예: 2024-04-01)' },
+    { no: 10, name: '종료일',            required: '필수',   needsDictionary: false, description: 'YYYY-MM-DD 형식 (예: 2024-04-30)' },
+    { no: 11, name: '광고 세트명',       required: '필수',   needsDictionary: false, description: '실제 매체에 등록된 광고 세트/그룹명' },
     { no: 12, name: '광고 세트 일 예산', required: '조건부', needsDictionary: false, description: '광고 세트 예산(13번)과 둘 중 하나' },
-    { no: 13, name: '광고 세트 예산',  required: '조건부', needsDictionary: false, description: '광고 세트 일 예산(12번)과 둘 중 하나' },
-    { no: 14, name: '캠페인 목적',     required: '필수',   needsDictionary: true,  description: 'API 코드 또는 한글 기입 (예: 트래픽 / OUTCOME_TRAFFIC)' },
-    { no: 15, name: '구매 유형',       required: '필수',   needsDictionary: true,  description: 'API 코드 또는 한글 기입 (예: 경매 / AUCTION)' },
-    { no: 16, name: '광고명',          required: '선택',   needsDictionary: false, description: '광고 소재명 (없어도 검수 가능)' },
-    { no: 17, name: '랜딩 URL',        required: '선택',   needsDictionary: false, description: '광고 클릭 시 이동되는 랜딩 페이지 URL' },
-    { no: 18, name: 'UTM 파라미터',    required: '선택',   needsDictionary: false, description: 'utm_source=fb&utm_medium=cpa 형식' },
-    { no: 19, name: '최적화 목표',     required: '필수',   needsDictionary: true,  description: 'API 코드 또는 한글 기입 (예: 전환 / CONVERSIONS)' },
-    { no: 20, name: '과금 기준',       required: '필수',   needsDictionary: true,  description: 'API 코드 또는 한글 기입 (예: 노출 / IMPRESSIONS)' },
-    { no: 21, name: '픽셀/이벤트',     required: '선택',   needsDictionary: false, description: '픽셀 ID 또는 이벤트 이름 입력' },
-    { no: 22, name: '이벤트 유형',     required: '선택',   needsDictionary: false, description: '표준 이벤트명 또는 사용자 지정 이벤트명 입력' },
+    { no: 13, name: '광고 세트 예산',    required: '조건부', needsDictionary: false, description: '광고 세트 일 예산(12번)과 둘 중 하나' },
+    { no: 14, name: '캠페인 목적',       required: '필수',   needsDictionary: true,  description: 'API 코드 또는 한글 기입 (예: 트래픽 / OUTCOME_TRAFFIC)' },
+    { no: 15, name: '구매 유형',         required: '필수',   needsDictionary: true,  description: 'API 코드 또는 한글 기입 (예: 경매 / AUCTION)' },
+    { no: 16, name: '광고명',            required: '선택',   needsDictionary: false, description: '광고 소재명 (없어도 검수 가능)' },
+    { no: 17, name: '헤드라인',          required: '선택',   needsDictionary: false, description: '[소재 검수 ver2] 소재 헤드라인 문구. API 실제 등록값과 대조합니다.' },
+    { no: 18, name: '본문 카피',         required: '선택',   needsDictionary: false, description: '[소재 검수 ver2] 소재 기본 본문 카피. API 실제 등록값과 대조합니다.' },
+    { no: 19, name: '행동유도(CTA)',     required: '선택',   needsDictionary: false, description: '[소재 검수 ver2] CTA 버튼 유형 (예: 더 알아보기 / 지금 가입하기).' },
+    { no: 20, name: '랜딩 URL',          required: '선택',   needsDictionary: false, description: '지면별 URL 구분 시 줄바꿈(Alt+Enter) 사용. 예: [페이스북 (피드)] https://... — 매체 사전 지면 가이드 참고' },
+    { no: 21, name: 'UTM 파라미터',      required: '선택',   needsDictionary: false, description: '지면별 UTM도 줄바꿈 구분 가능. utm_source=fb&utm_medium=cpa 형식' },
+    { no: 22, name: '최적화 목표',       required: '필수',   needsDictionary: true,  description: 'API 코드 또는 한글 기입 (예: 전환 / CONVERSIONS)' },
+    { no: 23, name: '과금 기준',         required: '필수',   needsDictionary: true,  description: 'API 코드 또는 한글 기입 (예: 노출 / IMPRESSIONS)' },
+    { no: 24, name: '픽셀/이벤트',       required: '선택',   needsDictionary: false, description: '픽셀 ID 또는 이벤트 이름 입력' },
+    { no: 25, name: '이벤트 유형',       required: '선택',   needsDictionary: false, description: '표준 이벤트명 또는 사용자 지정 이벤트명 입력' },
 ];
 
 
@@ -59,6 +62,9 @@ export interface ParsedRow {
     CampaignObjective: string;
     CampaignBuyingType: string;
     AdName: string;
+    Headline: string;
+    BodyCopy: string;
+    CTA: string;
     LandingURL: string;
     UTMParameters: string;
     AdSetOptimizationGoal: string;
@@ -82,6 +88,8 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
     const [results, setResults] = useState<AuditResult[] | null>(null);
     const [isDragOver, setIsDragOver] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [viewMode, setViewMode] = useState<'ver1' | 'ver2'>('ver1');
+    const [showPlacementGuide, setShowPlacementGuide] = useState(false);
 
 
     const downloadTemplate = () => {
@@ -89,7 +97,9 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
             '매체', '팀명', '계정 ID',
             '캠페인 ID', '캠페인명', '통화', '캠페인 일 예산', '캠페인 예산', '시작일', '종료일',
             '광고 세트명', '광고 세트 일 예산', '광고 세트 예산',
-            '캠페인 목적', '구매 유형', '광고명', '랜딩 URL', 'UTM 파라미터',
+            '캠페인 목적', '구매 유형', '광고명',
+            '헤드라인', '본문 카피', '행동유도(CTA)',
+            '랜딩 URL', 'UTM 파라미터',
             '최적화 목표', '과금 기준', '픽셀/이벤트', '이벤트 유형'
         ];
 
@@ -97,14 +107,18 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
             'Meta', teamName || '소속 팀명 입력', '1777607596977990',
             '120456789012', '24년_봄_프로모션_캠페인', 'KRW', '500000', '10000000', '2024-04-01', '2024-04-30',
             '세트_A_타겟', '', '2000000',
-            'OUTCOME_SALES', 'AUCTION', '이미지_소재_1', 'https://example.com/spring', 'utm_source=fb&utm_medium=cpa',
+            'OUTCOME_SALES', 'AUCTION', '이미지_소재_1',
+            '봄 프로모션 특가!', '지금 바로 확인하세요. 한정 수량 특가 판매 중.', '지금 쇼핑하기',
+            '[기본 설정 / 페이스북 (피드)] https://example.com/spring', '[기본 설정 / 페이스북 (피드)] utm_source=fb&utm_medium=feed',
             'CONVERSIONS', 'IMPRESSIONS', '123456789', 'Purchase'
         ];
         const mockData2 = [
             'Meta', teamName || '소속 팀명 입력', '1777607596977990',
             '', '24년_가을_프로모션_캠페인', 'KRW', '', '20000000', '2024-09-01', '2024-09-30',
             '세트_B_타겟', '50000', '',
-            'OUTCOME_TRAFFIC', 'AUCTION', '참여유도_소재_A', 'https://example.com/fall', 'utm_source=fb&utm_medium=cpc',
+            'OUTCOME_TRAFFIC', 'AUCTION', '참여유도_소재_A',
+            '가을 이벤트', '특별한 가을을 만끽하세요.', '더 알아보기',
+            'https://example.com/fall', 'utm_source=fb&utm_medium=cpc',
             'LINK_CLICKS', 'IMPRESSIONS', '', ''
         ];
 
@@ -114,7 +128,7 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
         const wsData = xlsx.utils.aoa_to_sheet([headers, mockData1, mockData2]);
 
         // Apply number and date formatting to cells
-        const range = xlsx.utils.decode_range(wsData['!ref'] || 'A1:V3');
+        const range = xlsx.utils.decode_range(wsData['!ref'] || 'A1:Y3');
         for (let r = range.s.r; r <= range.e.r; r++) {
             if (r === 0) continue; // Skip header row
 
@@ -256,6 +270,9 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
                     CampaignObjective: item['캠페인 목적'] || '',
                     CampaignBuyingType: item['구매 유형'] || '',
                     AdName: item['광고명'] || '',
+                    Headline: item['헤드라인'] || '',
+                    BodyCopy: item['본문 카피'] || '',
+                    CTA: item['행동유도(CTA)'] || '',
                     LandingURL: item['랜딩 URL'] || '',
                     UTMParameters: item['UTM 파라미터'] || '',
                     AdSetOptimizationGoal: item['최적화 목표'] || '',
@@ -405,8 +422,46 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
                             <Download className="w-4 h-4" />
                             기본 엑셀 양식 템플릿 다운로드
                         </button>
+                        {/* 지면 가이드 파업 버튼 */}
+                        <button
+                            onClick={(e) => { e.stopPropagation(); setShowPlacementGuide(v => !v); }}
+                            className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold border rounded-xl transition-colors ${
+                                showPlacementGuide
+                                    ? 'border-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300'
+                                    : 'border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700'
+                            }`}
+                        >
+                            <Map className="w-4 h-4" />
+                            지면 가이드 {showPlacementGuide ? '닫기' : '보기'}
+                        </button>
 
-                        {/* 매체 사전 바로가기 */}
+                        {showPlacementGuide && (
+                            <div className="bg-white dark:bg-zinc-900 border border-indigo-200 dark:border-indigo-800/50 rounded-xl p-3 text-xs space-y-2 shadow-md">
+                                <p className="font-bold text-indigo-700 dark:text-indigo-300 flex items-center gap-1">📌 엑셀 지면 키워드 초단본</p>
+                                <div className="space-y-1">
+                                    {[
+                                        { kw: '기본 설정', api: 'facebook_feed' },
+                                        { kw: '페이스북 (피드)', api: 'facebook_feed' },
+                                        { kw: '페이스북 (스토리)', api: 'facebook_story' },
+                                        { kw: '페이스북 (릴스)', api: 'facebook_reels' },
+                                        { kw: '인스타그램 (스트림)', api: 'instagram_stream' },
+                                        { kw: '인스타그램 (스토리)', api: 'instagram_story' },
+                                        { kw: '인스타그램 (릴스)', api: 'instagram_reels' },
+                                    ].map(({ kw, api }) => (
+                                        <div key={kw} className="flex items-center gap-2">
+                                            <code className="px-1.5 py-0.5 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 rounded font-mono text-[10px] border border-indigo-200 dark:border-indigo-800/50 whitespace-nowrap">{kw}</code>
+                                            <span className="text-zinc-400">→</span>
+                                            <code className="text-zinc-400 font-mono text-[10px] truncate">{api}</code>
+                                        </div>
+                                    ))}
+                                </div>
+                                <a href="/dictionary" target="_blank" rel="noopener noreferrer"
+                                    className="flex items-center gap-1 text-indigo-600 dark:text-indigo-400 font-semibold hover:underline mt-1">
+                                    <ExternalLink className="w-3 h-3" /> 전체 지면 가이드 보기
+                                </a>
+                            </div>
+                        )}
+
                         <a
                             href="/dictionary"
                             target="_blank"
@@ -436,8 +491,8 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
                                     <Download className="w-3.5 h-3.5" />
                                 </div>
                                 <div>
-                                    <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">22개 표준 컬럼 가이드</h3>
-                                    <p className="text-[11px] text-zinc-400 mt-0.5">템플릿 작성 전 필수 여부를 확인하세요</p>
+                                    <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">25개 표준 컬럼 가이드</h3>
+                                    <p className="text-[11px] text-zinc-400 mt-0.5">17~19번(소재 검수 ver2)은 선택 입력입니다</p>
                                 </div>
                             </div>
                             {/* 범례 */}
@@ -547,6 +602,24 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
                             <p className="text-xs text-zinc-500 mt-0.5">총 {rows.length}개의 광고 세트/그룹 행이 파싱되었습니다.</p>
                         </div>
                         <div className="flex gap-2">
+                            <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-lg border border-zinc-200 dark:border-zinc-700">
+                                <button onClick={() => setViewMode('ver1')}
+                                    className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
+                                        viewMode === 'ver1'
+                                            ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm'
+                                            : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'
+                                    }`}>
+                                    캠페인 세팅 내역서 (ver1)
+                                </button>
+                                <button onClick={() => setViewMode('ver2')}
+                                    className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
+                                        viewMode === 'ver2'
+                                            ? 'bg-indigo-600 text-white shadow-sm'
+                                            : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'
+                                    }`}>
+                                    소재 참조 세부 내역서 (ver2)
+                                </button>
+                            </div>
                             <button
                                 onClick={() => { setRows([]); setResults(null); }}
                                 className="px-4 py-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-lg transition-colors"
@@ -594,6 +667,11 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
                                     <th className="px-4 py-3 font-medium bg-blue-50 dark:bg-blue-900/20">캠페인 목적</th>
                                     <th className="px-4 py-3 font-medium bg-blue-50 dark:bg-blue-900/20">구매 유형</th>
                                     <th className="px-4 py-3 font-medium bg-emerald-50 dark:bg-emerald-900/20">광고명</th>
+                                    {viewMode === 'ver2' && <>
+                                        <th className="px-4 py-3 font-medium bg-violet-50 dark:bg-violet-900/20">헤드라인</th>
+                                        <th className="px-4 py-3 font-medium bg-violet-50 dark:bg-violet-900/20">본문 카피</th>
+                                        <th className="px-4 py-3 font-medium bg-violet-50 dark:bg-violet-900/20">CTA</th>
+                                    </>}
                                     <th className="px-4 py-3 font-medium bg-emerald-50 dark:bg-emerald-900/20">랜딩 URL</th>
                                     <th className="px-4 py-3 font-medium bg-emerald-50 dark:bg-emerald-900/20">UTM 파라미터</th>
                                     <th className="px-4 py-3 font-medium bg-indigo-50 dark:bg-indigo-900/20">최적화 목표</th>
@@ -654,6 +732,11 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
                                             <td className="px-4 py-3 text-zinc-500 font-mono text-[10px] bg-blue-50/20 dark:bg-blue-900/10">{row.CampaignBuyingType}</td>
 
                                             <td className="px-4 py-3 font-semibold text-zinc-900 dark:text-zinc-200 max-w-[150px] truncate bg-emerald-50/20 dark:bg-emerald-900/10">{row.AdName}</td>
+                                            {viewMode === 'ver2' && <>
+                                                <td className="px-4 py-3 text-zinc-700 dark:text-zinc-300 max-w-[150px] truncate bg-violet-50/20 dark:bg-violet-900/10" title={row.Headline}>{row.Headline || <span className="text-zinc-300 dark:text-zinc-600">-</span>}</td>
+                                                <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400 max-w-[180px] truncate bg-violet-50/20 dark:bg-violet-900/10 text-[10px]" title={row.BodyCopy}>{row.BodyCopy || <span className="text-zinc-300 dark:text-zinc-600">-</span>}</td>
+                                                <td className="px-4 py-3 bg-violet-50/20 dark:bg-violet-900/10">{row.CTA ? <span className="px-2 py-0.5 bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 rounded text-[10px] font-semibold">{row.CTA}</span> : <span className="text-zinc-300 dark:text-zinc-600">-</span>}</td>
+                                            </>}
                                             <td className="px-4 py-3 text-zinc-500 max-w-[150px] truncate bg-emerald-50/20 dark:bg-emerald-900/10" title={row.LandingURL}>
                                                 <a href={row.LandingURL} target="_blank" rel="noreferrer" className="hover:text-indigo-500 underline">{row.LandingURL}</a>
                                             </td>
