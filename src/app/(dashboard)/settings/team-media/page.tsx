@@ -61,8 +61,8 @@ export default async function TeamMediaPage() {
                     let next: string | null = url;
                     const results: any[] = [];
                     while (next) {
-                        const res = await fetch(next, { cache: 'no-store' });
-                        const json = await res.json();
+                        const res: Response = await fetch(next, { cache: 'no-store' });
+                        const json: any = await res.json();
                         if (json.error) break;
                         if (json.data) results.push(...json.data);
                         next = json.paging?.next || null;

@@ -17,31 +17,31 @@ interface ColumnMeta {
 }
 
 const COLUMN_META: ColumnMeta[] = [
-    { no: 1,  name: '매체',              required: '필수',   needsDictionary: false, description: 'Meta 또는 Google Ads 입력' },
-    { no: 2,  name: '팀명',              required: '필수',   needsDictionary: false, description: '소속 팀명 (예: 퍼포먼스팀)' },
-    { no: 3,  name: '계정 ID',           required: '필수',   needsDictionary: false, description: '매체 광고 계정 ID (숫자 그대로 입력)' },
-    { no: 4,  name: '캠페인 ID',         required: '선택',   needsDictionary: false, description: '비워두면 캠페인명 기준으로 조회' },
-    { no: 5,  name: '캠페인명',          required: '필수',   needsDictionary: false, description: '실제 매체에 등록된 캠페인 이름' },
-    { no: 6,  name: '통화',              required: '필수',   needsDictionary: false, description: 'ISO 4217 코드 (KRW, USD, JPY 등)' },
-    { no: 7,  name: '캠페인 일 예산',    required: '조건부', needsDictionary: false, description: '캠페인 예산(8번)과 둘 중 하나 필수' },
-    { no: 8,  name: '캠페인 예산',       required: '조건부', needsDictionary: false, description: '캠페인 일 예산(7번)과 둘 중 하나 필수' },
-    { no: 9,  name: '시작일',            required: '필수',   needsDictionary: false, description: 'YYYY-MM-DD 형식 (예: 2024-04-01)' },
-    { no: 10, name: '종료일',            required: '필수',   needsDictionary: false, description: 'YYYY-MM-DD 형식 (예: 2024-04-30)' },
-    { no: 11, name: '광고 세트명',       required: '필수',   needsDictionary: false, description: '실제 매체에 등록된 광고 세트/그룹명' },
+    { no: 1, name: '매체', required: '필수', needsDictionary: false, description: 'Meta 또는 Google Ads 입력' },
+    { no: 2, name: '팀명', required: '필수', needsDictionary: false, description: '소속 팀명 (예: 퍼포먼스팀)' },
+    { no: 3, name: '계정 ID', required: '필수', needsDictionary: false, description: '매체 광고 계정 ID (숫자 그대로 입력)' },
+    { no: 4, name: '캠페인 ID', required: '선택', needsDictionary: false, description: '비워두면 캠페인명 기준으로 조회' },
+    { no: 5, name: '캠페인명', required: '필수', needsDictionary: false, description: '실제 매체에 등록된 캠페인 이름' },
+    { no: 6, name: '통화', required: '필수', needsDictionary: false, description: 'ISO 4217 코드 (KRW, USD, JPY 등)' },
+    { no: 7, name: '캠페인 일 예산', required: '조건부', needsDictionary: false, description: '캠페인 예산(8번)과 둘 중 하나 필수' },
+    { no: 8, name: '캠페인 예산', required: '조건부', needsDictionary: false, description: '캠페인 일 예산(7번)과 둘 중 하나 필수' },
+    { no: 9, name: '시작일', required: '필수', needsDictionary: false, description: 'YYYY-MM-DD 형식 (예: 2024-04-01)' },
+    { no: 10, name: '종료일', required: '필수', needsDictionary: false, description: 'YYYY-MM-DD 형식 (예: 2024-04-30)' },
+    { no: 11, name: '광고 세트명', required: '필수', needsDictionary: false, description: '실제 매체에 등록된 광고 세트/그룹명' },
     { no: 12, name: '광고 세트 일 예산', required: '조건부', needsDictionary: false, description: '광고 세트 예산(13번)과 둘 중 하나' },
-    { no: 13, name: '광고 세트 예산',    required: '조건부', needsDictionary: false, description: '광고 세트 일 예산(12번)과 둘 중 하나' },
-    { no: 14, name: '캠페인 목적',       required: '필수',   needsDictionary: true,  description: 'API 코드 또는 한글 기입 (예: 트래픽 / OUTCOME_TRAFFIC)' },
-    { no: 15, name: '구매 유형',         required: '필수',   needsDictionary: true,  description: 'API 코드 또는 한글 기입 (예: 경매 / AUCTION)' },
-    { no: 16, name: '광고명',            required: '선택',   needsDictionary: false, description: '광고 소재명 (없어도 검수 가능)' },
-    { no: 17, name: '헤드라인',          required: '선택',   needsDictionary: false, description: '[소재 검수 ver2] 소재 헤드라인 문구. API 실제 등록값과 대조합니다.' },
-    { no: 18, name: '본문 카피',         required: '선택',   needsDictionary: false, description: '[소재 검수 ver2] 소재 기본 본문 카피. API 실제 등록값과 대조합니다.' },
-    { no: 19, name: '행동유도(CTA)',     required: '선택',   needsDictionary: false, description: '[소재 검수 ver2] CTA 버튼 유형 (예: 더 알아보기 / 지금 가입하기).' },
-    { no: 20, name: '랜딩 URL',          required: '선택',   needsDictionary: false, description: '지면별 URL 구분 시 줄바꿈(Alt+Enter) 사용. 예: [페이스북 (피드)] https://... — 매체 사전 지면 가이드 참고' },
-    { no: 21, name: 'UTM 파라미터',      required: '선택',   needsDictionary: false, description: '지면별 UTM도 줄바꿈 구분 가능. utm_source=fb&utm_medium=cpa 형식' },
-    { no: 22, name: '최적화 목표',       required: '필수',   needsDictionary: true,  description: 'API 코드 또는 한글 기입 (예: 전환 / CONVERSIONS)' },
-    { no: 23, name: '과금 기준',         required: '필수',   needsDictionary: true,  description: 'API 코드 또는 한글 기입 (예: 노출 / IMPRESSIONS)' },
-    { no: 24, name: '픽셀/이벤트',       required: '선택',   needsDictionary: false, description: '픽셀 ID 또는 이벤트 이름 입력' },
-    { no: 25, name: '이벤트 유형',       required: '선택',   needsDictionary: false, description: '표준 이벤트명 또는 사용자 지정 이벤트명 입력' },
+    { no: 13, name: '광고 세트 예산', required: '조건부', needsDictionary: false, description: '광고 세트 일 예산(12번)과 둘 중 하나' },
+    { no: 14, name: '캠페인 목적', required: '필수', needsDictionary: true, description: 'API 코드 또는 한글 기입 (예: 트래픽 / OUTCOME_TRAFFIC)' },
+    { no: 15, name: '구매 유형', required: '필수', needsDictionary: true, description: 'API 코드 또는 한글 기입 (예: 경매 / AUCTION)' },
+    { no: 16, name: '광고명', required: '선택', needsDictionary: false, description: '광고 소재명 (없어도 검수 가능)' },
+    { no: 17, name: '헤드라인', required: '선택', needsDictionary: false, description: '[소재 검수 ver2] 소재 헤드라인 문구. API 실제 등록값과 대조합니다.' },
+    { no: 18, name: '본문 카피', required: '선택', needsDictionary: false, description: '[소재 검수 ver2] 소재 기본 본문 카피. API 실제 등록값과 대조합니다.' },
+    { no: 19, name: '행동유도(CTA)', required: '선택', needsDictionary: false, description: '[소재 검수 ver2] CTA 버튼 유형 (예: 더 알아보기 / 지금 가입하기).' },
+    { no: 20, name: '랜딩 URL', required: '선택', needsDictionary: false, description: '지면별 URL 구분 시 줄바꿈(Alt+Enter) 사용. 예: [페이스북 (피드)] https://... — 매체 사전 지면 가이드 참고' },
+    { no: 21, name: 'UTM 파라미터', required: '선택', needsDictionary: false, description: '지면별 UTM도 줄바꿈 구분 가능. utm_source=fb&utm_medium=cpa 형식' },
+    { no: 22, name: '최적화 목표', required: '필수', needsDictionary: true, description: 'API 코드 또는 한글 기입 (예: 전환 / CONVERSIONS)' },
+    { no: 23, name: '과금 기준', required: '필수', needsDictionary: true, description: 'API 코드 또는 한글 기입 (예: 노출 / IMPRESSIONS)' },
+    { no: 24, name: '픽셀/이벤트', required: '선택', needsDictionary: false, description: '픽셀 ID 또는 이벤트 이름 입력' },
+    { no: 25, name: '이벤트 유형', required: '선택', needsDictionary: false, description: '표준 이벤트명 또는 사용자 지정 이벤트명 입력' },
 ];
 
 
@@ -113,7 +113,7 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
             'CONVERSIONS', 'IMPRESSIONS', '123456789', 'Purchase'
         ];
         const mockData2 = [
-            'Meta', teamName || '소속 팀명 입력', '1777607596977990',
+            'GOOGLE_ADS', teamName || '소속 팀명 입력', '1234567890',
             '', '24년_가을_프로모션_캠페인', 'KRW', '', '20000000', '2024-09-01', '2024-09-30',
             '세트_B_타겟', '50000', '',
             'OUTCOME_TRAFFIC', 'AUCTION', '참여유도_소재_A',
@@ -287,25 +287,25 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
                 //
                 // 승계 필드 → 원본 Excel 헤더명 매핑
                 const FILL_DOWN_MAP: { field: keyof ParsedRow; header: string }[] = [
-                    { field: 'Platform',               header: '매체' },
-                    { field: 'Team',                   header: '팀명' },
-                    { field: 'AccountID',              header: '계정 ID' },
-                    { field: 'CampaignID',             header: '캠페인 ID' },
-                    { field: 'CampaignName',           header: '캠페인명' },
-                    { field: 'Currency',               header: '통화' },
-                    { field: 'CampaignDailyBudget',    header: '캠페인 일 예산' },
+                    { field: 'Platform', header: '매체' },
+                    { field: 'Team', header: '팀명' },
+                    { field: 'AccountID', header: '계정 ID' },
+                    { field: 'CampaignID', header: '캠페인 ID' },
+                    { field: 'CampaignName', header: '캠페인명' },
+                    { field: 'Currency', header: '통화' },
+                    { field: 'CampaignDailyBudget', header: '캠페인 일 예산' },
                     { field: 'CampaignLifetimeBudget', header: '캠페인 예산' },
-                    { field: 'StartDate',              header: '시작일' },
-                    { field: 'EndDate',                header: '종료일' },
-                    { field: 'CampaignObjective',      header: '캠페인 목적' },
-                    { field: 'CampaignBuyingType',     header: '구매 유형' },
-                    { field: 'AdSetName',              header: '광고 세트명' },
-                    { field: 'AdSetDailyBudget',       header: '광고 세트 일 예산' },
-                    { field: 'AdSetLifetimeBudget',    header: '광고 세트 예산' },
-                    { field: 'AdSetOptimizationGoal',  header: '최적화 목표' },
-                    { field: 'AdSetBillingEvent',      header: '과금 기준' },
-                    { field: 'PixelID',                header: '픽셀/이벤트' },
-                    { field: 'CustomEventType',        header: '이벤트 유형' },
+                    { field: 'StartDate', header: '시작일' },
+                    { field: 'EndDate', header: '종료일' },
+                    { field: 'CampaignObjective', header: '캠페인 목적' },
+                    { field: 'CampaignBuyingType', header: '구매 유형' },
+                    { field: 'AdSetName', header: '광고 세트명' },
+                    { field: 'AdSetDailyBudget', header: '광고 세트 일 예산' },
+                    { field: 'AdSetLifetimeBudget', header: '광고 세트 예산' },
+                    { field: 'AdSetOptimizationGoal', header: '최적화 목표' },
+                    { field: 'AdSetBillingEvent', header: '과금 기준' },
+                    { field: 'PixelID', header: '픽셀/이벤트' },
+                    { field: 'CustomEventType', header: '이벤트 유형' },
                     // ↓ 승계 제외: AdName, LandingURL, UTMParameters (광고 단위 고유값)
                 ];
 
@@ -386,11 +386,10 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
                     <div className="w-72 shrink-0 flex flex-col gap-3">
                         {/* 업로드 드래그 존 */}
                         <div
-                            className={`flex-1 border-2 border-dashed rounded-xl flex flex-col items-center justify-center gap-4 p-6 transition-all cursor-pointer ${
-                                isDragOver
+                            className={`flex-1 border-2 border-dashed rounded-xl flex flex-col items-center justify-center gap-4 p-6 transition-all cursor-pointer ${isDragOver
                                     ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 shadow-inner'
                                     : 'border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900/50 hover:bg-zinc-100 dark:hover:bg-zinc-900'
-                            }`}
+                                }`}
                             onClick={() => fileInputRef.current?.click()}
                             onDragOver={handleDragOver}
                             onDragLeave={handleDragLeave}
@@ -425,11 +424,10 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
                         {/* 지면 가이드 파업 버튼 */}
                         <button
                             onClick={(e) => { e.stopPropagation(); setShowPlacementGuide(v => !v); }}
-                            className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold border rounded-xl transition-colors ${
-                                showPlacementGuide
+                            className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold border rounded-xl transition-colors ${showPlacementGuide
                                     ? 'border-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300'
                                     : 'border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700'
-                            }`}
+                                }`}
                         >
                             <Map className="w-4 h-4" />
                             지면 가이드 {showPlacementGuide ? '닫기' : '보기'}
@@ -542,18 +540,16 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
                                     {COLUMN_META.map((col) => (
                                         <tr
                                             key={col.no}
-                                            className={`transition-colors ${
-                                                col.needsDictionary
+                                            className={`transition-colors ${col.needsDictionary
                                                     ? 'bg-amber-50/60 dark:bg-amber-950/20 hover:bg-amber-50 dark:hover:bg-amber-950/30'
                                                     : 'bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/40'
-                                            }`}
+                                                }`}
                                         >
                                             <td className="px-3 py-2 text-center text-xs font-mono text-zinc-400">{col.no}</td>
                                             <td className="px-3 py-2">
                                                 <div className="flex items-center gap-2 flex-wrap">
-                                                    <span className={`font-semibold text-xs ${
-                                                        col.needsDictionary ? 'text-amber-800 dark:text-amber-300' : 'text-zinc-800 dark:text-zinc-200'
-                                                    }`}>
+                                                    <span className={`font-semibold text-xs ${col.needsDictionary ? 'text-amber-800 dark:text-amber-300' : 'text-zinc-800 dark:text-zinc-200'
+                                                        }`}>
                                                         {col.name}
                                                     </span>
                                                     {col.needsDictionary && (
@@ -604,19 +600,17 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
                         <div className="flex gap-2">
                             <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-lg border border-zinc-200 dark:border-zinc-700">
                                 <button onClick={() => setViewMode('ver1')}
-                                    className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
-                                        viewMode === 'ver1'
+                                    className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${viewMode === 'ver1'
                                             ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-sm'
                                             : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'
-                                    }`}>
+                                        }`}>
                                     캠페인 세팅 내역서 (ver1)
                                 </button>
                                 <button onClick={() => setViewMode('ver2')}
-                                    className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${
-                                        viewMode === 'ver2'
+                                    className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${viewMode === 'ver2'
                                             ? 'bg-indigo-600 text-white shadow-sm'
                                             : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300'
-                                    }`}>
+                                        }`}>
                                     소재 참조 세부 내역서 (ver2)
                                 </button>
                             </div>
@@ -657,15 +651,19 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
                                     <th className="px-4 py-3 font-medium bg-zinc-200/50 dark:bg-zinc-700/50">계정 ID</th>
                                     <th className="px-4 py-3 font-medium bg-blue-50 dark:bg-blue-900/20">캠페인 ID</th>
                                     <th className="px-4 py-3 font-medium bg-blue-50 dark:bg-blue-900/20">캠페인명</th>
-                                    <th className="px-4 py-3 font-medium bg-blue-50 dark:bg-blue-900/20 text-right">캠페인 일 예산</th>
-                                    <th className="px-4 py-3 font-medium bg-blue-50 dark:bg-blue-900/20 text-right">캠페인 예산</th>
-                                    <th className="px-4 py-3 font-medium bg-zinc-200/50 dark:bg-zinc-700/50">시작일</th>
-                                    <th className="px-4 py-3 font-medium bg-zinc-200/50 dark:bg-zinc-700/50">종료일</th>
+                                    {viewMode === 'ver1' && <>
+                                        <th className="px-4 py-3 font-medium bg-blue-50 dark:bg-blue-900/20 text-right">캠페인 일 예산</th>
+                                        <th className="px-4 py-3 font-medium bg-blue-50 dark:bg-blue-900/20 text-right">캠페인 예산</th>
+                                        <th className="px-4 py-3 font-medium bg-zinc-200/50 dark:bg-zinc-700/50">시작일</th>
+                                        <th className="px-4 py-3 font-medium bg-zinc-200/50 dark:bg-zinc-700/50">종료일</th>
+                                    </>}
                                     <th className="px-4 py-3 font-medium bg-indigo-50 dark:bg-indigo-900/20">광고 세트명</th>
-                                    <th className="px-4 py-3 font-medium bg-indigo-50 dark:bg-indigo-900/20 text-right">세트 일 예산</th>
-                                    <th className="px-4 py-3 font-medium bg-indigo-50 dark:bg-indigo-900/20 text-right">세트 예산</th>
-                                    <th className="px-4 py-3 font-medium bg-blue-50 dark:bg-blue-900/20">캠페인 목적</th>
-                                    <th className="px-4 py-3 font-medium bg-blue-50 dark:bg-blue-900/20">구매 유형</th>
+                                    {viewMode === 'ver1' && <>
+                                        <th className="px-4 py-3 font-medium bg-indigo-50 dark:bg-indigo-900/20 text-right">세트 일 예산</th>
+                                        <th className="px-4 py-3 font-medium bg-indigo-50 dark:bg-indigo-900/20 text-right">세트 예산</th>
+                                        <th className="px-4 py-3 font-medium bg-blue-50 dark:bg-blue-900/20">캠페인 목적</th>
+                                        <th className="px-4 py-3 font-medium bg-blue-50 dark:bg-blue-900/20">구매 유형</th>
+                                    </>}
                                     <th className="px-4 py-3 font-medium bg-emerald-50 dark:bg-emerald-900/20">광고명</th>
                                     {viewMode === 'ver2' && <>
                                         <th className="px-4 py-3 font-medium bg-violet-50 dark:bg-violet-900/20">헤드라인</th>
@@ -711,32 +709,39 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
                                             <td className="px-4 py-3 font-mono text-zinc-500 text-[10px]">{row.AccountID}</td>
                                             <td className="px-4 py-3 font-mono text-zinc-400 text-[10px] bg-blue-50/20 dark:bg-blue-900/10">{row.CampaignID || '-'}</td>
                                             <td className="px-4 py-3 font-semibold text-zinc-900 dark:text-zinc-200 max-w-[150px] truncate bg-blue-50/20 dark:bg-blue-900/10" title={row.CampaignName}>{row.CampaignName}</td>
-                                            <td className="px-4 py-3 text-right font-medium text-zinc-600 dark:text-zinc-400 bg-blue-50/20 dark:bg-blue-900/10">
-                                                {row.CampaignDailyBudget > 0 ? row.CampaignDailyBudget.toLocaleString() : '-'}
-                                            </td>
-                                            <td className="px-4 py-3 text-right font-medium text-zinc-600 dark:text-zinc-400 bg-blue-50/20 dark:bg-blue-900/10">
-                                                {row.CampaignLifetimeBudget > 0 ? row.CampaignLifetimeBudget.toLocaleString() : '-'}
-                                            </td>
-                                            <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400 text-[10px] bg-zinc-50/50 dark:bg-zinc-800/30">{row.StartDate}</td>
-                                            <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400 text-[10px] bg-zinc-50/50 dark:bg-zinc-800/30">{row.EndDate}</td>
+
+                                            {viewMode === 'ver1' && <>
+                                                <td className="px-4 py-3 text-right font-medium text-zinc-600 dark:text-zinc-400 bg-blue-50/20 dark:bg-blue-900/10">
+                                                    {row.CampaignDailyBudget > 0 ? row.CampaignDailyBudget.toLocaleString() : '-'}
+                                                </td>
+                                                <td className="px-4 py-3 text-right font-medium text-zinc-600 dark:text-zinc-400 bg-blue-50/20 dark:bg-blue-900/10">
+                                                    {row.CampaignLifetimeBudget > 0 ? row.CampaignLifetimeBudget.toLocaleString() : '-'}
+                                                </td>
+                                                <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400 text-[10px] bg-zinc-50/50 dark:bg-zinc-800/30">{row.StartDate}</td>
+                                                <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400 text-[10px] bg-zinc-50/50 dark:bg-zinc-800/30">{row.EndDate}</td>
+                                            </>}
 
                                             <td className="px-4 py-3 text-indigo-700 dark:text-indigo-300 font-medium max-w-[150px] truncate bg-indigo-50/20 dark:bg-indigo-900/10" title={row.AdSetName}>{row.AdSetName}</td>
-                                            <td className="px-4 py-3 text-right font-medium text-zinc-600 dark:text-zinc-400 bg-indigo-50/20 dark:bg-indigo-900/10">
-                                                {row.AdSetDailyBudget > 0 ? row.AdSetDailyBudget.toLocaleString() : '-'}
-                                            </td>
-                                            <td className="px-4 py-3 text-right font-medium text-zinc-600 dark:text-zinc-400 bg-indigo-50/20 dark:bg-indigo-900/10">
-                                                {row.AdSetLifetimeBudget > 0 ? row.AdSetLifetimeBudget.toLocaleString() : '-'}
-                                            </td>
 
-                                            <td className="px-4 py-3 text-zinc-500 max-w-[100px] truncate bg-blue-50/20 dark:bg-blue-900/10">{row.CampaignObjective}</td>
-                                            <td className="px-4 py-3 text-zinc-500 font-mono text-[10px] bg-blue-50/20 dark:bg-blue-900/10">{row.CampaignBuyingType}</td>
+                                            {viewMode === 'ver1' && <>
+                                                <td className="px-4 py-3 text-right font-medium text-zinc-600 dark:text-zinc-400 bg-indigo-50/20 dark:bg-indigo-900/10">
+                                                    {row.AdSetDailyBudget > 0 ? row.AdSetDailyBudget.toLocaleString() : '-'}
+                                                </td>
+                                                <td className="px-4 py-3 text-right font-medium text-zinc-600 dark:text-zinc-400 bg-indigo-50/20 dark:bg-indigo-900/10">
+                                                    {row.AdSetLifetimeBudget > 0 ? row.AdSetLifetimeBudget.toLocaleString() : '-'}
+                                                </td>
+                                                <td className="px-4 py-3 text-zinc-500 max-w-[100px] truncate bg-blue-50/20 dark:bg-blue-900/10">{row.CampaignObjective}</td>
+                                                <td className="px-4 py-3 text-zinc-500 font-mono text-[10px] bg-blue-50/20 dark:bg-blue-900/10">{row.CampaignBuyingType}</td>
+                                            </>}
 
                                             <td className="px-4 py-3 font-semibold text-zinc-900 dark:text-zinc-200 max-w-[150px] truncate bg-emerald-50/20 dark:bg-emerald-900/10">{row.AdName}</td>
+
                                             {viewMode === 'ver2' && <>
                                                 <td className="px-4 py-3 text-zinc-700 dark:text-zinc-300 max-w-[150px] truncate bg-violet-50/20 dark:bg-violet-900/10" title={row.Headline}>{row.Headline || <span className="text-zinc-300 dark:text-zinc-600">-</span>}</td>
                                                 <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400 max-w-[180px] truncate bg-violet-50/20 dark:bg-violet-900/10 text-[10px]" title={row.BodyCopy}>{row.BodyCopy || <span className="text-zinc-300 dark:text-zinc-600">-</span>}</td>
                                                 <td className="px-4 py-3 bg-violet-50/20 dark:bg-violet-900/10">{row.CTA ? <span className="px-2 py-0.5 bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 rounded text-[10px] font-semibold">{row.CTA}</span> : <span className="text-zinc-300 dark:text-zinc-600">-</span>}</td>
                                             </>}
+
                                             <td className="px-4 py-3 text-zinc-500 max-w-[150px] truncate bg-emerald-50/20 dark:bg-emerald-900/10" title={row.LandingURL}>
                                                 <a href={row.LandingURL} target="_blank" rel="noreferrer" className="hover:text-indigo-500 underline">{row.LandingURL}</a>
                                             </td>

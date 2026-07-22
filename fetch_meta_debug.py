@@ -18,7 +18,7 @@ if not SUPABASE_URL or not SUPABASE_KEY or not META_TOKEN:
     exit(1)
 
 # 3. Meta API 기본 정보 세팅
-ACCOUNT_ID = '891499703223547'
+ACCOUNT_ID = '1267556304705160'
 API_VERSION = 'v19.0'
 BASE_URL = f"https://graph.facebook.com/{API_VERSION}"
 
