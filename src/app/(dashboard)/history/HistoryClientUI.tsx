@@ -158,7 +158,17 @@ export default function HistoryClientUI({ logs, isAdmin }: { logs: any[], isAdmi
                                                                         </td>
                                                                         <td className="px-4 py-4 font-medium whitespace-normal max-w-xl align-top">
                                                                             <div className="flex flex-col gap-2">
-                                                                                <span className={`${d.passed ? 'line-through text-zinc-400' : 'text-rose-500'}`}>{d.errors?.join(', ')}</span>
+                                                                                <div className="flex flex-wrap gap-1.5">
+                                                                                    {d.errors && d.errors.length > 0 ? (
+                                                                                        d.errors.map((errStr: string, idx: number) => (
+                                                                                            <span key={idx} className={`inline-block text-[11px] px-2 py-0.5 rounded font-medium ${d.passed ? 'line-through bg-zinc-100 dark:bg-zinc-800 text-zinc-400' : 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800/60'}`}>
+                                                                                                ❌ {errStr}
+                                                                                            </span>
+                                                                                        ))
+                                                                                    ) : (
+                                                                                        <span className="text-emerald-600 dark:text-emerald-400 text-xs font-semibold">✓ 모든 항목 연동 정상</span>
+                                                                                    )}
+                                                                                </div>
 
                                                                                 {!d.passed && (
                                                                                     <div className="mt-1">
@@ -168,7 +178,7 @@ export default function HistoryClientUI({ logs, isAdmin }: { logs: any[], isAdmi
                                                                                             className="inline-flex items-center gap-1 text-[10px] px-2 py-1 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 rounded shadow-sm transition-all"
                                                                                             title="정상적인 예외 상황일 경우 누릅니다."
                                                                                         >
-                                                                                            {isPassing === `${log.id}-${d.rowId}` ? '처리 중...' : <><CheckCircle2 className="w-3 h-3" />오류 내역 Pass 확인</>}
+                                                                                            {isPassing === `${log.id}-${d.rowId}` ? '처리 중...' : <><CheckCircle2 className="w-3 h-3 text-emerald-500" />오류 내역 Pass 확인</>}
                                                                                         </button>
                                                                                     </div>
                                                                                 )}

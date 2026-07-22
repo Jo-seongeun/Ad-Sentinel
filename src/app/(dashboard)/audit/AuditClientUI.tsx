@@ -73,12 +73,21 @@ export interface ParsedRow {
     CustomEventType: string;
 }
 
+export interface FieldDiff {
+    excelVal: string;
+    apiVal: string;
+    matched: boolean;
+    status?: 'PASS' | 'FAIL' | 'WARNING';
+    message?: string;
+}
+
 export interface AuditResult {
     rowId: number;
     CampaignName: string;
     AdSetName: string;
     status: 'PASS' | 'FAIL' | 'WARNING';
     errors: string[];
+    fieldDiffs?: Record<string, FieldDiff>;
 }
 
 export default function AuditClientUI({ teamId, teamName }: { teamId?: string, teamName?: string }) {
@@ -375,6 +384,55 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
 
     // 매체 사전 필요 컬럼 목록
     const dictColumns = COLUMN_META.filter(c => c.needsDictionary);
+
+    const renderDiffCell = (
+        excelValue: string | number | undefined,
+        fieldKey: string,
+        res: AuditResult | undefined,
+        isNumberFormatter?: boolean
+    ) => {
+        const diff = res?.fieldDiffs?.[fieldKey];
+
+        if (!res || !diff) {
+            if (isNumberFormatter && typeof excelValue === 'number') {
+                return excelValue > 0 ? excelValue.toLocaleString() : '-';
+            }
+            return <span className="truncate">{excelValue ? String(excelValue) : '-'}</span>;
+        }
+
+        const excelText = diff.excelVal || (isNumberFormatter && typeof excelValue === 'number' && excelValue > 0 ? excelValue.toLocaleString() : String(excelValue || '-'));
+        const apiText = diff.apiVal || '-';
+
+        if (!diff.matched) {
+            return (
+                <div className="p-2 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 text-xs my-0.5 whitespace-normal min-w-[160px] max-w-[240px] shadow-sm">
+                    <div className="text-[10px] font-bold text-rose-600 dark:text-rose-400 mb-1 flex items-center gap-1">
+                        <span>❌ {diff.message || '불일치'}</span>
+                    </div>
+                    <div className="text-[11px] leading-tight space-y-1">
+                        <div className="text-zinc-700 dark:text-zinc-300">
+                            <span className="font-semibold text-zinc-500 dark:text-zinc-400">계획:</span> {excelText}
+                        </div>
+                        <div className="text-rose-700 dark:text-rose-300 font-semibold">
+                            <span className="font-semibold text-rose-800 dark:text-rose-400">실제:</span> {apiText}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        return (
+            <div className="py-1 text-xs whitespace-normal min-w-[140px] max-w-[220px]">
+                <div className="text-[11px] text-zinc-700 dark:text-zinc-300 leading-snug">
+                    <span className="text-[10px] text-zinc-400 font-semibold">계획:</span> {excelText}
+                </div>
+                <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium leading-snug flex items-center gap-1 mt-0.5">
+                    <span><span className="text-zinc-400">실제:</span> {apiText}</span>
+                    <span className="text-[9px] bg-emerald-100 dark:bg-emerald-950/60 px-1 py-0.2 rounded font-bold shrink-0">✓ 일치</span>
+                </div>
+            </div>
+        );
+    };
 
     return (
         <div className="flex-1 overflow-hidden flex flex-col gap-4">
@@ -682,22 +740,17 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
                                 {rows.map((row, i) => {
                                     const res = results?.find(r => r.rowId === i);
                                     return (
-                                        <tr key={i} className={`hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors ${res?.status === 'FAIL' ? 'bg-rose-50/50 dark:bg-rose-900/10' : res?.status === 'WARNING' ? 'bg-orange-50/30' : ''}`}>
+                                        <tr key={i} className={`hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors ${res?.status === 'FAIL' ? 'bg-rose-50/30 dark:bg-rose-900/10' : res?.status === 'WARNING' ? 'bg-orange-50/20' : ''}`}>
                                             <td className="px-4 py-3 text-center text-zinc-500 font-mono">{i + 1}</td>
-                                            <td className="px-4 py-3">
+                                            <td className="px-4 py-3 text-center">
                                                 {!results ? (
                                                     <span className="text-zinc-400">- 대기 -</span>
                                                 ) : res?.status === 'PASS' ? (
-                                                    <span className="inline-flex items-center gap-1 text-emerald-600 font-semibold bg-emerald-100 dark:bg-emerald-900/30 px-2 py-0.5 rounded-full"><CheckCircle2 className="w-3 h-3" /> PASS</span>
+                                                    <span className="inline-flex items-center gap-1 text-emerald-600 font-bold bg-emerald-100 dark:bg-emerald-900/30 px-2.5 py-1 rounded-full text-xs shadow-sm"><CheckCircle2 className="w-3.5 h-3.5" /> PASS</span>
                                                 ) : res?.status === 'FAIL' ? (
-                                                    <span className="inline-flex items-center gap-1 text-rose-600 font-semibold bg-rose-100 dark:bg-rose-900/30 px-2 py-0.5 rounded-full"><AlertCircle className="w-3 h-3" /> FAIL</span>
+                                                    <span className="inline-flex items-center gap-1 text-rose-600 font-bold bg-rose-100 dark:bg-rose-900/30 px-2.5 py-1 rounded-full text-xs shadow-sm"><AlertCircle className="w-3.5 h-3.5" /> FAIL</span>
                                                 ) : (
-                                                    <span className="inline-flex items-center gap-1 text-orange-600 font-semibold bg-orange-100 dark:bg-orange-900/30 px-2 py-0.5 rounded-full"><AlertCircle className="w-3 h-3" /> WARN</span>
-                                                )}
-                                                {res?.errors && res.errors.length > 0 && (
-                                                    <div className="mt-1 text-[10px] text-rose-500 max-w-[200px] truncate" title={res.errors.join(', ')}>
-                                                        {res.errors[0]} {res.errors.length > 1 && `외 ${res.errors.length - 1}개 오류`}
-                                                    </div>
+                                                    <span className="inline-flex items-center gap-1 text-orange-600 font-bold bg-orange-100 dark:bg-orange-900/30 px-2.5 py-1 rounded-full text-xs shadow-sm"><AlertCircle className="w-3.5 h-3.5" /> WARN</span>
                                                 )}
                                             </td>
                                             <td className="px-4 py-3">
@@ -711,46 +764,64 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
                                             <td className="px-4 py-3 font-semibold text-zinc-900 dark:text-zinc-200 max-w-[150px] truncate bg-blue-50/20 dark:bg-blue-900/10" title={row.CampaignName}>{row.CampaignName}</td>
 
                                             {viewMode === 'ver1' && <>
-                                                <td className="px-4 py-3 text-right font-medium text-zinc-600 dark:text-zinc-400 bg-blue-50/20 dark:bg-blue-900/10">
-                                                    {row.CampaignDailyBudget > 0 ? row.CampaignDailyBudget.toLocaleString() : '-'}
+                                                <td className="px-4 py-3 bg-blue-50/20 dark:bg-blue-900/10">
+                                                    {renderDiffCell(row.CampaignLifetimeBudget || row.CampaignDailyBudget, 'CampaignBudget', res, true)}
                                                 </td>
-                                                <td className="px-4 py-3 text-right font-medium text-zinc-600 dark:text-zinc-400 bg-blue-50/20 dark:bg-blue-900/10">
-                                                    {row.CampaignLifetimeBudget > 0 ? row.CampaignLifetimeBudget.toLocaleString() : '-'}
+                                                <td className="px-4 py-3 bg-zinc-50/50 dark:bg-zinc-800/30">
+                                                    {renderDiffCell(row.StartDate, 'StartDate', res)}
                                                 </td>
-                                                <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400 text-[10px] bg-zinc-50/50 dark:bg-zinc-800/30">{row.StartDate}</td>
-                                                <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400 text-[10px] bg-zinc-50/50 dark:bg-zinc-800/30">{row.EndDate}</td>
+                                                <td className="px-4 py-3 bg-zinc-50/50 dark:bg-zinc-800/30">
+                                                    {renderDiffCell(row.EndDate, 'EndDate', res)}
+                                                </td>
                                             </>}
 
                                             <td className="px-4 py-3 text-indigo-700 dark:text-indigo-300 font-medium max-w-[150px] truncate bg-indigo-50/20 dark:bg-indigo-900/10" title={row.AdSetName}>{row.AdSetName}</td>
 
                                             {viewMode === 'ver1' && <>
-                                                <td className="px-4 py-3 text-right font-medium text-zinc-600 dark:text-zinc-400 bg-indigo-50/20 dark:bg-indigo-900/10">
-                                                    {row.AdSetDailyBudget > 0 ? row.AdSetDailyBudget.toLocaleString() : '-'}
+                                                <td className="px-4 py-3 bg-indigo-50/20 dark:bg-indigo-900/10">
+                                                    {renderDiffCell(row.AdSetLifetimeBudget || row.AdSetDailyBudget, 'AdSetBudget', res, true)}
                                                 </td>
-                                                <td className="px-4 py-3 text-right font-medium text-zinc-600 dark:text-zinc-400 bg-indigo-50/20 dark:bg-indigo-900/10">
-                                                    {row.AdSetLifetimeBudget > 0 ? row.AdSetLifetimeBudget.toLocaleString() : '-'}
+                                                <td className="px-4 py-3 bg-blue-50/20 dark:bg-blue-900/10">
+                                                    {renderDiffCell(row.CampaignObjective, 'CampaignObjective', res)}
                                                 </td>
-                                                <td className="px-4 py-3 text-zinc-500 max-w-[100px] truncate bg-blue-50/20 dark:bg-blue-900/10">{row.CampaignObjective}</td>
-                                                <td className="px-4 py-3 text-zinc-500 font-mono text-[10px] bg-blue-50/20 dark:bg-blue-900/10">{row.CampaignBuyingType}</td>
+                                                <td className="px-4 py-3 bg-blue-50/20 dark:bg-blue-900/10">
+                                                    {renderDiffCell(row.CampaignBuyingType, 'CampaignBuyingType', res)}
+                                                </td>
                                             </>}
 
                                             <td className="px-4 py-3 font-semibold text-zinc-900 dark:text-zinc-200 max-w-[150px] truncate bg-emerald-50/20 dark:bg-emerald-900/10">{row.AdName}</td>
 
                                             {viewMode === 'ver2' && <>
-                                                <td className="px-4 py-3 text-zinc-700 dark:text-zinc-300 max-w-[150px] truncate bg-violet-50/20 dark:bg-violet-900/10" title={row.Headline}>{row.Headline || <span className="text-zinc-300 dark:text-zinc-600">-</span>}</td>
-                                                <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400 max-w-[180px] truncate bg-violet-50/20 dark:bg-violet-900/10 text-[10px]" title={row.BodyCopy}>{row.BodyCopy || <span className="text-zinc-300 dark:text-zinc-600">-</span>}</td>
-                                                <td className="px-4 py-3 bg-violet-50/20 dark:bg-violet-900/10">{row.CTA ? <span className="px-2 py-0.5 bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 rounded text-[10px] font-semibold">{row.CTA}</span> : <span className="text-zinc-300 dark:text-zinc-600">-</span>}</td>
+                                                <td className="px-4 py-3 bg-violet-50/20 dark:bg-violet-900/10">
+                                                    {renderDiffCell(row.Headline, 'Headline', res)}
+                                                </td>
+                                                <td className="px-4 py-3 bg-violet-50/20 dark:bg-violet-900/10">
+                                                    {renderDiffCell(row.BodyCopy, 'BodyCopy', res)}
+                                                </td>
+                                                <td className="px-4 py-3 bg-violet-50/20 dark:bg-violet-900/10">
+                                                    {renderDiffCell(row.CTA, 'CTA', res)}
+                                                </td>
                                             </>}
 
-                                            <td className="px-4 py-3 text-zinc-500 max-w-[150px] truncate bg-emerald-50/20 dark:bg-emerald-900/10" title={row.LandingURL}>
-                                                <a href={row.LandingURL} target="_blank" rel="noreferrer" className="hover:text-indigo-500 underline">{row.LandingURL}</a>
+                                            <td className="px-4 py-3 bg-emerald-50/20 dark:bg-emerald-900/10">
+                                                {renderDiffCell(row.LandingURL, 'LandingURL', res)}
                                             </td>
-                                            <td className="px-4 py-3 text-zinc-500 font-mono text-[10px] max-w-[150px] truncate bg-emerald-50/20 dark:bg-emerald-900/10" title={row.UTMParameters}>{row.UTMParameters}</td>
+                                            <td className="px-4 py-3 bg-emerald-50/20 dark:bg-emerald-900/10">
+                                                {renderDiffCell(row.UTMParameters, 'UTMParameters', res)}
+                                            </td>
 
-                                            <td className="px-4 py-3 text-zinc-500 max-w-[100px] truncate text-[10px] bg-indigo-50/20 dark:bg-indigo-900/10">{row.AdSetOptimizationGoal}</td>
-                                            <td className="px-4 py-3 text-zinc-500 font-mono text-[10px] bg-indigo-50/20 dark:bg-indigo-900/10">{row.AdSetBillingEvent}</td>
-                                            <td className="px-4 py-3 text-zinc-500 font-mono text-[10px] bg-indigo-50/20 dark:bg-indigo-900/10">{row.PixelID}</td>
-                                            <td className="px-4 py-3 text-zinc-500 font-mono text-[10px] bg-indigo-50/20 dark:bg-indigo-900/10">{row.CustomEventType}</td>
+                                            <td className="px-4 py-3 bg-indigo-50/20 dark:bg-indigo-900/10">
+                                                {renderDiffCell(row.AdSetOptimizationGoal, 'AdSetOptimizationGoal', res)}
+                                            </td>
+                                            <td className="px-4 py-3 bg-indigo-50/20 dark:bg-indigo-900/10">
+                                                {renderDiffCell(row.AdSetBillingEvent, 'AdSetBillingEvent', res)}
+                                            </td>
+                                            <td className="px-4 py-3 bg-indigo-50/20 dark:bg-indigo-900/10">
+                                                {renderDiffCell(row.PixelID, 'PixelID', res)}
+                                            </td>
+                                            <td className="px-4 py-3 bg-indigo-50/20 dark:bg-indigo-900/10">
+                                                {renderDiffCell(row.CustomEventType, 'CustomEventType', res)}
+                                            </td>
                                         </tr>
                                     );
                                 })}

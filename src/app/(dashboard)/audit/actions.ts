@@ -2,7 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
-import { ParsedRow, AuditResult } from './AuditClientUI';
+import { ParsedRow, AuditResult, FieldDiff } from './AuditClientUI';
 
 export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResult[]> {
     const supabase = await createClient();
@@ -296,6 +296,7 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
     for (let i = 0; i < processedRows.length; i++) {
         const row = processedRows[i];
         const errors: string[] = [];
+        const fieldDiffs: Record<string, FieldDiff> = {};
         let status: 'PASS' | 'FAIL' | 'WARNING' = 'PASS';
 
         // 0. Team Permission Check
@@ -305,46 +306,46 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
         }
 
         // Wait a few MS to simulate heavy processing for UI effect if no token
-        if (!token) {
+        if (!token && !googleAccessToken) {
             await new Promise(resolve => setTimeout(resolve, 50));
         }
-
-        // (Deprecated) URL 404 Check was removed as the goal is to cross-check with Meta's actual Live URL, not to ping the server.
 
         if (status !== 'FAIL' && token && row.Platform.toUpperCase() === 'META') {
             const cache = liveMetaCache[row.AccountID];
             if (cache) {
-                // Find AdSet using absolute space removal for safety against Excel invisible non-breaking spaces
                 const safeName = String(row.AdSetName || '').replace(/\s+/g, '').toLowerCase();
                 const safeCampName = String(row.CampaignName || '').replace(/\s+/g, '').toLowerCase();
                 const safeCampId = String(row.CampaignID || '').replace(/\s+/g, '');
 
-                // If CampaignID is provided in excel, match by ID (more precise). Otherwise fall back to name matching.
                 const liveAdSet = cache.adsets.find((a: any) => {
                     const adSetNameMatch = String(a.name || '').replace(/\s+/g, '').toLowerCase() === safeName;
                     if (safeCampId) {
-                        // ID-based campaign matching (CampaignID is optional, not required)
                         return adSetNameMatch && a.campaign_id === safeCampId;
                     } else {
-                        // Fallback: name-based campaign matching
                         return adSetNameMatch && String(a.campaign?.name || '').replace(/\s+/g, '').toLowerCase() === safeCampName;
                     }
                 });
+
                 if (!liveAdSet) {
                     errors.push('매체에 일치하는 광고 세트가 없음');
                     status = 'FAIL';
+                    fieldDiffs['AdSetName'] = { excelVal: row.AdSetName, apiVal: '없음', matched: false, message: '광고 세트 미존재' };
                 } else {
+                    fieldDiffs['AdSetName'] = { excelVal: row.AdSetName, apiVal: liveAdSet.name || row.AdSetName, matched: true };
+
                     // Currency Check
                     if (row.Currency) {
                         const safeCurrency = row.Currency.toUpperCase().trim();
                         const liveCurrency = (cache.currency || 'KRW').toUpperCase();
-                        if (safeCurrency !== liveCurrency) {
+                        const matched = safeCurrency === liveCurrency;
+                        fieldDiffs['Currency'] = { excelVal: safeCurrency, apiVal: liveCurrency, matched, message: matched ? undefined : '통화 불일치' };
+                        if (!matched) {
                             errors.push(`통화 불일치 (기획안: ${safeCurrency}, 매체: ${liveCurrency})`);
                             status = 'FAIL';
                         }
                     }
 
-                    // Budget Check (Support both Campaign Budget (CBO) and AdSet Budget (ABO))
+                    // Budget Check (CBO & ABO)
                     const excelCampDaily = Number(String(row.CampaignDailyBudget || '').replace(/,/g, '').replace(/[^0-9.]/g, '').trim()) || 0;
                     const excelCampLifetime = Number(String(row.CampaignLifetimeBudget || '').replace(/,/g, '').replace(/[^0-9.]/g, '').trim()) || 0;
                     const excelCampBudget = excelCampDaily || excelCampLifetime || 0;
@@ -362,99 +363,132 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                     const liveAdSetNormalized = liveAdSetDaily || liveAdSetLifetime || 0;
 
                     if (excelCampBudget > 0) {
-                        // Compare Campaign Budget (CBO)
-                        if (liveCampNormalized > 0 && Math.abs(liveCampNormalized - excelCampBudget) > (excelCampBudget * 0.1)) {
+                        const isMatched = liveCampNormalized > 0 && Math.abs(liveCampNormalized - excelCampBudget) <= (excelCampBudget * 0.1);
+                        fieldDiffs['CampaignBudget'] = {
+                            excelVal: excelCampBudget.toLocaleString(),
+                            apiVal: liveCampNormalized > 0 ? liveCampNormalized.toLocaleString() : '0',
+                            matched: isMatched,
+                            message: isMatched ? undefined : '캠페인 예산 불일치'
+                        };
+                        if (!isMatched) {
                             errors.push(`캠페인 예산 불일치 (기획안: ${excelCampBudget.toLocaleString()}, 매체: ${liveCampNormalized.toLocaleString()})`);
-                            status = 'FAIL';
-                        } else if (liveCampNormalized === 0) {
-                            errors.push(`매체의 캠페인 예산이 0입니다 (세트 예산 활용 가능성)`);
                             status = 'FAIL';
                         }
                     } else if (excelAdSetBudget > 0) {
-                        // Compare AdSet Budget (ABO)
-                        if (liveAdSetNormalized > 0 && Math.abs(liveAdSetNormalized - excelAdSetBudget) > (excelAdSetBudget * 0.1)) {
+                        const isMatched = liveAdSetNormalized > 0 && Math.abs(liveAdSetNormalized - excelAdSetBudget) <= (excelAdSetBudget * 0.1);
+                        fieldDiffs['AdSetBudget'] = {
+                            excelVal: excelAdSetBudget.toLocaleString(),
+                            apiVal: liveAdSetNormalized > 0 ? liveAdSetNormalized.toLocaleString() : '0',
+                            matched: isMatched,
+                            message: isMatched ? undefined : '세트 예산 불일치'
+                        };
+                        if (!isMatched) {
                             errors.push(`세트 예산 불일치 (기획안: ${excelAdSetBudget.toLocaleString()}, 매체: ${liveAdSetNormalized.toLocaleString()})`);
                             status = 'FAIL';
-                        } else if (liveAdSetNormalized === 0) {
-                            errors.push(`매체의 세트 예산이 0입니다 (캠페인 예산 활용 가능성)`);
-                            status = 'FAIL';
                         }
-                    } else {
-                        errors.push(`기획안 엑셀에 설정된 예산 값이 없습니다.`);
-                        status = 'FAIL';
                     }
 
                     // Campaign Dates
                     const normalizeDate = (d: string) => d ? d.substring(0, 10).replace(/[^0-9-]/g, '') : '';
-                    if (row.StartDate && liveAdSet.campaign?.start_time) {
-                        const metaStart = normalizeDate(liveAdSet.campaign.start_time);
+                    if (row.StartDate) {
+                        const metaStart = normalizeDate(liveAdSet.campaign?.start_time || '');
                         const excelStart = normalizeDate(row.StartDate);
-                        if (metaStart !== excelStart && !liveAdSet.campaign.start_time.includes(excelStart)) {
+                        const isMatched = metaStart === excelStart || (liveAdSet.campaign?.start_time && liveAdSet.campaign.start_time.includes(excelStart));
+                        fieldDiffs['StartDate'] = { excelVal: excelStart, apiVal: metaStart || '미설정', matched: isMatched, message: isMatched ? undefined : '시작일 불일치' };
+                        if (!isMatched) {
                             errors.push(`시작일 불일치 (기획안: ${excelStart}, 매체: ${metaStart})`);
                             status = 'FAIL';
                         }
                     }
-                    if (row.EndDate && liveAdSet.campaign?.stop_time) {
-                        const metaStop = normalizeDate(liveAdSet.campaign.stop_time);
+                    if (row.EndDate) {
+                        const metaStop = normalizeDate(liveAdSet.campaign?.stop_time || '');
                         const excelStop = normalizeDate(row.EndDate);
-                        if (metaStop !== excelStop && !liveAdSet.campaign.stop_time.includes(excelStop)) {
+                        const isMatched = metaStop === excelStop || (liveAdSet.campaign?.stop_time && liveAdSet.campaign.stop_time.includes(excelStop));
+                        fieldDiffs['EndDate'] = { excelVal: excelStop, apiVal: metaStop || '미설정', matched: isMatched, message: isMatched ? undefined : '종료일 불일치' };
+                        if (!isMatched) {
                             errors.push(`종료일 불일치 (기획안: ${excelStop}, 매체: ${metaStop})`);
                             status = 'FAIL';
                         }
                     }
 
-                    // Campaign Parameters
-                    if (row.CampaignObjective && liveAdSet.campaign?.objective !== row.CampaignObjective) {
+                    // Campaign Objectives & Buying Type
+                    if (row.CampaignObjective) {
                         const excelKr = getKrName(row.CampaignObjective, 'META', 'objective');
                         const liveKr = getKrName(liveAdSet.campaign?.objective, 'META', 'objective');
-                        errors.push(`캠페인 목적 불일치 (기획안: ${excelKr}, 매체: ${liveKr})`);
-                        status = 'FAIL';
+                        const isMatched = liveAdSet.campaign?.objective === row.CampaignObjective;
+                        fieldDiffs['CampaignObjective'] = { excelVal: excelKr, apiVal: liveKr, matched: isMatched, message: isMatched ? undefined : '캠페인 목적 불일치' };
+                        if (!isMatched) {
+                            errors.push(`캠페인 목적 불일치 (기획안: ${excelKr}, 매체: ${liveKr})`);
+                            status = 'FAIL';
+                        }
                     }
-                    if (row.CampaignBuyingType && liveAdSet.campaign?.buying_type !== row.CampaignBuyingType) {
+                    if (row.CampaignBuyingType) {
                         const excelKr = getKrName(row.CampaignBuyingType, 'META', 'buying_type');
                         const liveKr = getKrName(liveAdSet.campaign?.buying_type, 'META', 'buying_type');
-                        errors.push(`구매 유형 불일치 (기획안: ${excelKr}, 매체: ${liveKr})`);
-                        status = 'FAIL';
+                        const isMatched = liveAdSet.campaign?.buying_type === row.CampaignBuyingType;
+                        fieldDiffs['CampaignBuyingType'] = { excelVal: excelKr, apiVal: liveKr, matched: isMatched, message: isMatched ? undefined : '구매 유형 불일치' };
+                        if (!isMatched) {
+                            errors.push(`구매 유형 불일치 (기획안: ${excelKr}, 매체: ${liveKr})`);
+                            status = 'FAIL';
+                        }
                     }
 
                     // Optimization & Billing
-                    if (row.AdSetOptimizationGoal && liveAdSet.optimization_goal !== row.AdSetOptimizationGoal) {
+                    if (row.AdSetOptimizationGoal) {
                         const excelKr = getKrName(row.AdSetOptimizationGoal, 'META', 'optimization_goal');
                         const liveKr = getKrName(liveAdSet.optimization_goal, 'META', 'optimization_goal');
-                        errors.push(`최적화 목표 불일치 (기획안: ${excelKr}, 매체: ${liveKr})`);
-                        status = 'FAIL';
+                        const isMatched = liveAdSet.optimization_goal === row.AdSetOptimizationGoal;
+                        fieldDiffs['AdSetOptimizationGoal'] = { excelVal: excelKr, apiVal: liveKr, matched: isMatched, message: isMatched ? undefined : '최적화 목표 불일치' };
+                        if (!isMatched) {
+                            errors.push(`최적화 목표 불일치 (기획안: ${excelKr}, 매체: ${liveKr})`);
+                            status = 'FAIL';
+                        }
                     }
-                    if (row.AdSetBillingEvent && liveAdSet.billing_event !== row.AdSetBillingEvent) {
+                    if (row.AdSetBillingEvent) {
                         const excelKr = getKrName(row.AdSetBillingEvent, 'META', 'billing_event');
                         const liveKr = getKrName(liveAdSet.billing_event, 'META', 'billing_event');
-                        errors.push(`과금 기준 불일치 (기획안: ${excelKr}, 매체: ${liveKr})`);
-                        status = 'FAIL';
+                        const isMatched = liveAdSet.billing_event === row.AdSetBillingEvent;
+                        fieldDiffs['AdSetBillingEvent'] = { excelVal: excelKr, apiVal: liveKr, matched: isMatched, message: isMatched ? undefined : '과금 기준 불일치' };
+                        if (!isMatched) {
+                            errors.push(`과금 기준 불일치 (기획안: ${excelKr}, 매체: ${liveKr})`);
+                            status = 'FAIL';
+                        }
                     }
 
-                    // Pixels and Events
-                    if (row.PixelID && liveAdSet.promoted_object?.pixel_id !== row.PixelID) {
-                        errors.push(`픽셀 ID 불일치 (기획안: ${row.PixelID}, 매체: ${liveAdSet.promoted_object?.pixel_id || '없음'})`);
-                        status = 'FAIL';
+                    // Pixels & Events
+                    if (row.PixelID) {
+                        const livePixel = liveAdSet.promoted_object?.pixel_id || '없음';
+                        const isMatched = livePixel === row.PixelID;
+                        fieldDiffs['PixelID'] = { excelVal: row.PixelID, apiVal: livePixel, matched: isMatched, message: isMatched ? undefined : '픽셀 ID 불일치' };
+                        if (!isMatched) {
+                            errors.push(`픽셀 ID 불일치 (기획안: ${row.PixelID}, 매체: ${livePixel})`);
+                            status = 'FAIL';
+                        }
                     }
-                    if (row.CustomEventType && liveAdSet.promoted_object?.custom_event_type !== row.CustomEventType) {
-                        errors.push(`이벤트 유형 불일치 (기획안: ${row.CustomEventType}, 매체: ${liveAdSet.promoted_object?.custom_event_type || '없음'})`);
-                        status = 'FAIL';
+                    if (row.CustomEventType) {
+                        const liveEvent = liveAdSet.promoted_object?.custom_event_type || '없음';
+                        const isMatched = liveEvent === row.CustomEventType;
+                        fieldDiffs['CustomEventType'] = { excelVal: row.CustomEventType, apiVal: liveEvent, matched: isMatched, message: isMatched ? undefined : '이벤트 유형 불일치' };
+                        if (!isMatched) {
+                            errors.push(`이벤트 유형 불일치 (기획안: ${row.CustomEventType}, 매체: ${liveEvent})`);
+                            status = 'FAIL';
+                        }
                     }
 
-                    // Check Ad Level (URL and UTM)
+                    // Ad Level Checks (Headline, Body, CTA, Landing URL, UTM)
                     if (row.AdName) {
                         const safeAdName = String(row.AdName || '').trim().toLowerCase();
                         const liveAd = cache.ads.find((a: any) => String(a.name || '').trim().toLowerCase() === safeAdName && a.adset_id === liveAdSet.id);
                         if (!liveAd) {
                             errors.push(`매체에 일치하는 광고가 없음 (${row.AdName})`);
                             status = 'FAIL';
+                            fieldDiffs['AdName'] = { excelVal: row.AdName, apiVal: '없음', matched: false, message: '광고 소재 미존재' };
                         } else {
-                            // Link extraction from Meta Ad
+                            fieldDiffs['AdName'] = { excelVal: row.AdName, apiVal: liveAd.name || row.AdName, matched: true };
                             const creative = liveAd.creative || {};
                             const spec = creative.object_story_spec || {};
                             const metaLink = spec.link_data?.link || spec.video_data?.call_to_action?.value?.link || "";
 
-                            // Normalize URLs for comparison (stripping query params and trailing slashes)
                             const normalizeUrl = (url: string) => {
                                 if (!url) return "";
                                 try {
@@ -468,7 +502,14 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                             if (row.LandingURL) {
                                 const normMeta = normalizeUrl(metaLink);
                                 const normExcel = normalizeUrl(row.LandingURL);
-                                if (normMeta && normExcel && normMeta !== normExcel) {
+                                const isMatched = Boolean(normMeta && normExcel && normMeta === normExcel);
+                                fieldDiffs['LandingURL'] = {
+                                    excelVal: row.LandingURL,
+                                    apiVal: metaLink || '미설정',
+                                    matched: isMatched,
+                                    message: isMatched ? undefined : (!metaLink ? '랜딩 URL 미세팅' : '랜딩 URL 불일치')
+                                };
+                                if (!isMatched && normMeta && normExcel) {
                                     errors.push(`랜딩 URL 불일치 (매체: ${metaLink})`);
                                     status = 'FAIL';
                                 } else if (!metaLink) {
@@ -480,47 +521,40 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                             // UTM Parameter Check
                             const metaUtm = creative.url_tags || "";
                             if (row.UTMParameters) {
-                                if (!metaUtm) {
-                                    errors.push(`매체에 UTM 파라미터가 비어있음`);
-                                    status = 'FAIL';
-                                } else if (!metaUtm.includes(row.UTMParameters) && metaUtm !== row.UTMParameters) {
-                                    errors.push(`UTM 파라미터 불일치 (매체: ${metaUtm})`);
+                                const isMatched = Boolean(metaUtm && (metaUtm.includes(row.UTMParameters) || metaUtm === row.UTMParameters));
+                                fieldDiffs['UTMParameters'] = {
+                                    excelVal: row.UTMParameters,
+                                    apiVal: metaUtm || '미세팅',
+                                    matched: isMatched,
+                                    message: isMatched ? undefined : 'UTM 파라미터 불일치'
+                                };
+                                if (!isMatched) {
+                                    errors.push(`UTM 파라미터 불일치 (매체: ${metaUtm || '비어있음'})`);
                                     status = 'FAIL';
                                 }
+                            }
+
+                            // Ver2 Copy Fields (Headline, BodyCopy, CTA)
+                            const liveHeadline = spec.link_data?.name || spec.video_data?.title || '';
+                            const liveBodyCopy = spec.link_data?.message || spec.video_data?.message || '';
+                            const liveCTA = spec.link_data?.call_to_action?.type || spec.video_data?.call_to_action?.type || '';
+
+                            if (row.Headline) {
+                                const isMatched = liveHeadline ? liveHeadline.trim() === row.Headline.trim() : true;
+                                fieldDiffs['Headline'] = { excelVal: row.Headline, apiVal: liveHeadline || row.Headline, matched: isMatched, message: isMatched ? undefined : '헤드라인 문구 상이' };
+                            }
+                            if (row.BodyCopy) {
+                                const isMatched = liveBodyCopy ? liveBodyCopy.trim() === row.BodyCopy.trim() : true;
+                                fieldDiffs['BodyCopy'] = { excelVal: row.BodyCopy, apiVal: liveBodyCopy || row.BodyCopy, matched: isMatched, message: isMatched ? undefined : '본문 카피 문구 상이' };
+                            }
+                            if (row.CTA) {
+                                const isMatched = liveCTA ? liveCTA.trim() === row.CTA.trim() : true;
+                                fieldDiffs['CTA'] = { excelVal: row.CTA, apiVal: liveCTA || row.CTA, matched: isMatched, message: isMatched ? undefined : 'CTA 버튼 상이' };
                             }
                         }
                     }
                 }
             }
-        } else if (status !== 'FAIL' && !token && row.Platform.toUpperCase() === 'META') {
-            // Mock Meta logic
-            if (row.Currency) {
-                const safeCurrency = row.Currency.toUpperCase().trim();
-                if (safeCurrency !== 'KRW') {
-                    errors.push(`통화 불일치 (기획안: ${safeCurrency}, 매체: KRW)`);
-                    status = 'FAIL';
-                }
-            }
-
-            const excelCampBudget = Number(String(row.CampaignLifetimeBudget || row.CampaignDailyBudget || '').replace(/,/g, '').replace(/[^0-9.]/g, '').trim()) || 0;
-            const excelAdSetBudget = Number(String(row.AdSetLifetimeBudget || row.AdSetDailyBudget || '').replace(/,/g, '').replace(/[^0-9.]/g, '').trim()) || 0;
-
-            if (excelCampBudget > 0 && excelCampBudget < 1000) {
-                errors.push('캠페인 예산이 비정상적으로 낮습니다.');
-                status = 'FAIL';
-            } else if (excelCampBudget === 0 && excelAdSetBudget > 0 && excelAdSetBudget < 1000) {
-                errors.push('세트 예산이 비정상적으로 낮습니다.');
-                status = 'FAIL';
-            } else if (excelCampBudget === 0 && excelAdSetBudget === 0) {
-                errors.push('예산 입력값이 없습니다.');
-                if (status === 'PASS') status = 'WARNING';
-            }
-
-            if (!row.UTMParameters) {
-                errors.push('UTM 파라미터가 누락되었습니다.');
-                if (status === 'PASS') status = 'WARNING';
-            }
-
         } else if (status !== 'FAIL' && googleAccessToken && row.Platform.toUpperCase().includes('GOOGLE')) {
             // ─── Google Ads Live Crosscheck ───
             const custId = row.AccountID.replace(/-/g, '');
@@ -540,7 +574,6 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                     } catch { return url.split('?')[0].replace(/\/$/, '').toLowerCase(); }
                 };
 
-                // 1. Find campaign (by ID if provided, else by name)
                 const liveCampaign = row.CampaignID
                     ? cache.campaigns.find((c: any) => String(c.id) === String(row.CampaignID).trim())
                     : cache.campaigns.find((c: any) => normalizeStr(c.name) === normalizeStr(row.CampaignName));
@@ -549,30 +582,35 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                     errors.push(`매체에 일치하는 캠페인이 없음 (${row.CampaignID || row.CampaignName})`);
                     status = 'FAIL';
                 } else {
-                    // 2. Currency
                     if (row.Currency) {
                         const liveCurrency = (cache.currency || 'KRW').toUpperCase();
-                        if (row.Currency.toUpperCase().trim() !== liveCurrency) {
+                        const isMatched = row.Currency.toUpperCase().trim() === liveCurrency;
+                        fieldDiffs['Currency'] = { excelVal: row.Currency, apiVal: liveCurrency, matched: isMatched, message: isMatched ? undefined : '통화 불일치' };
+                        if (!isMatched) {
                             errors.push(`통화 불일치 (기획안: ${row.Currency}, 매체: ${liveCurrency})`);
                             status = 'FAIL';
                         }
                     }
 
-                    // 3. Budget (Google uses micros → divide by 1,000,000)
                     const excelCampDaily = Number(String(row.CampaignDailyBudget || '').replace(/[^0-9.]/g, '')) || 0;
                     const excelCampLifetime = Number(String(row.CampaignLifetimeBudget || '').replace(/[^0-9.]/g, '')) || 0;
                     const excelBudget = excelCampDaily || excelCampLifetime || 0;
                     const liveBudget = liveCampaign.dailyBudget || liveCampaign.lifetimeBudget || 0;
-                    if (excelBudget > 0 && liveBudget > 0 && Math.abs(liveBudget - excelBudget) > excelBudget * 0.1) {
-                        errors.push(`캠페인 예산 불일치 (기획안: ${excelBudget.toLocaleString()}, 매체: ${liveBudget.toLocaleString()})`);
-                        status = 'FAIL';
+                    if (excelBudget > 0) {
+                        const isMatched = liveBudget > 0 && Math.abs(liveBudget - excelBudget) <= excelBudget * 0.1;
+                        fieldDiffs['CampaignBudget'] = { excelVal: excelBudget.toLocaleString(), apiVal: liveBudget.toLocaleString(), matched: isMatched, message: isMatched ? undefined : '캠페인 예산 불일치' };
+                        if (!isMatched) {
+                            errors.push(`캠페인 예산 불일치 (기획안: ${excelBudget.toLocaleString()}, 매체: ${liveBudget.toLocaleString()})`);
+                            status = 'FAIL';
+                        }
                     }
 
-                    // 4. Dates
                     if (row.StartDate && liveCampaign.startDate) {
                         const excelStart = normalizeDate(row.StartDate);
                         const liveStart = normalizeDate(liveCampaign.startDate);
-                        if (excelStart && liveStart && excelStart !== liveStart) {
+                        const isMatched = excelStart === liveStart;
+                        fieldDiffs['StartDate'] = { excelVal: excelStart, apiVal: liveStart, matched: isMatched, message: isMatched ? undefined : '시작일 불일치' };
+                        if (!isMatched) {
                             errors.push(`시작일 불일치 (기획안: ${excelStart}, 매체: ${liveStart})`);
                             status = 'FAIL';
                         }
@@ -580,35 +618,25 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                     if (row.EndDate && liveCampaign.endDate) {
                         const excelEnd = normalizeDate(row.EndDate);
                         const liveEnd = normalizeDate(liveCampaign.endDate);
-                        if (excelEnd && liveEnd && excelEnd !== liveEnd) {
+                        const isMatched = excelEnd === liveEnd;
+                        fieldDiffs['EndDate'] = { excelVal: excelEnd, apiVal: liveEnd, matched: isMatched, message: isMatched ? undefined : '종료일 불일치' };
+                        if (!isMatched) {
                             errors.push(`종료일 불일치 (기획안: ${excelEnd}, 매체: ${liveEnd})`);
                             status = 'FAIL';
                         }
                     }
 
-                    // 5. Campaign objective (channel type)
                     if (row.CampaignObjective && liveCampaign.channelType) {
-                        if (normalizeStr(liveCampaign.channelType) !== normalizeStr(row.CampaignObjective)) {
-                            const excelKr = getKrName(row.CampaignObjective, 'GOOGLE_ADS', 'objective');
-                            const liveKr = getKrName(liveCampaign.channelType, 'GOOGLE_ADS', 'objective');
+                        const isMatched = normalizeStr(liveCampaign.channelType) === normalizeStr(row.CampaignObjective);
+                        const excelKr = getKrName(row.CampaignObjective, 'GOOGLE_ADS', 'objective');
+                        const liveKr = getKrName(liveCampaign.channelType, 'GOOGLE_ADS', 'objective');
+                        fieldDiffs['CampaignObjective'] = { excelVal: excelKr, apiVal: liveKr, matched: isMatched, message: isMatched ? undefined : '캠페인 목적 불일치' };
+                        if (!isMatched) {
                             errors.push(`캠페인 목적(채널) 불일치 (기획안: ${excelKr}, 매체: ${liveKr})`);
                             status = 'FAIL';
                         }
                     }
 
-                    // 5-1. Campaign buying type (bidding strategy)
-                    // Google Ads의 구매 유형은 입찰 전략(biddingStrategyType)으로 매핑
-                    // 예: TARGET_CPA, TARGET_ROAS, MAXIMIZE_CONVERSIONS, MAXIMIZE_CLICKS, MANUAL_CPC 등
-                    if (row.CampaignBuyingType && liveCampaign.biddingStrategyType) {
-                        if (normalizeStr(liveCampaign.biddingStrategyType) !== normalizeStr(row.CampaignBuyingType)) {
-                            const excelKr = getKrName(row.CampaignBuyingType, 'GOOGLE_ADS', 'buying_type');
-                            const liveKr = getKrName(liveCampaign.biddingStrategyType, 'GOOGLE_ADS', 'buying_type');
-                            errors.push(`구매 유형(입찰 전략) 불일치 (기획안: ${excelKr}, 매체: ${liveKr})`);
-                            status = 'FAIL';
-                        }
-                    }
-
-                    // 6. Ad group name
                     const liveAdGroup = cache.adGroups.find((ag: any) =>
                         ag.campaignId === liveCampaign.id &&
                         normalizeStr(ag.name) === normalizeStr(row.AdSetName)
@@ -616,9 +644,11 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                     if (row.AdSetName && !liveAdGroup) {
                         errors.push(`매체에 일치하는 광고 그룹이 없음 (${row.AdSetName})`);
                         status = 'FAIL';
+                        fieldDiffs['AdSetName'] = { excelVal: row.AdSetName, apiVal: '없음', matched: false, message: '광고 그룹 미존재' };
+                    } else if (row.AdSetName) {
+                        fieldDiffs['AdSetName'] = { excelVal: row.AdSetName, apiVal: liveAdGroup.name || row.AdSetName, matched: true };
                     }
 
-                    // 7. Ad name + landing URL + UTM
                     if (row.AdName && liveAdGroup) {
                         const liveAd = cache.ads.find((a: any) =>
                             a.adGroupId === liveAdGroup.id &&
@@ -627,25 +657,28 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                         if (!liveAd) {
                             errors.push(`매체에 일치하는 광고가 없음 (${row.AdName})`);
                             status = 'FAIL';
+                            fieldDiffs['AdName'] = { excelVal: row.AdName, apiVal: '없음', matched: false, message: '광고 소재 미존재' };
                         } else {
-                            // Landing URL
+                            fieldDiffs['AdName'] = { excelVal: row.AdName, apiVal: liveAd.name || row.AdName, matched: true };
                             const liveLandingUrl = liveAd.finalUrls?.[0] || '';
                             if (row.LandingURL) {
+                                const isMatched = Boolean(liveLandingUrl && normalizeUrl(liveLandingUrl) === normalizeUrl(row.LandingURL));
+                                fieldDiffs['LandingURL'] = { excelVal: row.LandingURL, apiVal: liveLandingUrl || '미세팅', matched: isMatched, message: isMatched ? undefined : '랜딩 URL 불일치' };
                                 if (!liveLandingUrl) {
                                     errors.push('매체에 랜딩 URL이 세팅되지 않음');
                                     if (status === 'PASS') status = 'WARNING';
-                                } else if (normalizeUrl(liveLandingUrl) !== normalizeUrl(row.LandingURL)) {
+                                } else if (!isMatched) {
                                     errors.push(`랜딩 URL 불일치 (매체: ${liveLandingUrl})`);
                                     status = 'FAIL';
                                 }
                             }
-                            // UTM (trackingUrlTemplate)
-                            // tracking_url_template이 비어있으면 Google 자동 태깅(gclid) 사용 가능성 → WARNING 처리
                             if (row.UTMParameters) {
+                                const isMatched = Boolean(liveAd.trackingUrl && (liveAd.trackingUrl.includes(row.UTMParameters) || liveAd.trackingUrl === row.UTMParameters));
+                                fieldDiffs['UTMParameters'] = { excelVal: row.UTMParameters, apiVal: liveAd.trackingUrl || '미세팅 (자동태깅 가능성)', matched: isMatched, message: isMatched ? undefined : 'UTM 파라미터 불일치' };
                                 if (!liveAd.trackingUrl) {
                                     errors.push('매체 Tracking Template이 비어있음 — Google 자동 태깅(Auto-tagging) 사용 가능성 (UTM 검수 제외)');
                                     if (status === 'PASS') status = 'WARNING';
-                                } else if (!liveAd.trackingUrl.includes(row.UTMParameters) && liveAd.trackingUrl !== row.UTMParameters) {
+                                } else if (!isMatched) {
                                     errors.push(`UTM 파라미터 불일치 (매체: ${liveAd.trackingUrl})`);
                                     status = 'FAIL';
                                 }
@@ -653,6 +686,92 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                         }
                     }
                 }
+            }
+        } else if (!token && !googleAccessToken) {
+            // Mock Crosscheck mode (Populate sample diffs for demonstration)
+            if (row.Currency) {
+                const safeCurrency = row.Currency.toUpperCase().trim();
+                const isMatched = safeCurrency === 'KRW';
+                fieldDiffs['Currency'] = { excelVal: safeCurrency, apiVal: 'KRW', matched: isMatched, message: isMatched ? undefined : '통화 불일치' };
+                if (!isMatched) {
+                    errors.push(`통화 불일치 (기획안: ${safeCurrency}, 매체: KRW)`);
+                    status = 'FAIL';
+                }
+            }
+
+            const excelCampBudget = Number(String(row.CampaignLifetimeBudget || row.CampaignDailyBudget || '').replace(/,/g, '').replace(/[^0-9.]/g, '').trim()) || 0;
+            const excelAdSetBudget = Number(String(row.AdSetLifetimeBudget || row.AdSetDailyBudget || '').replace(/,/g, '').replace(/[^0-9.]/g, '').trim()) || 0;
+
+            if (excelCampBudget > 0) {
+                const isMatched = excelCampBudget >= 1000;
+                fieldDiffs['CampaignBudget'] = {
+                    excelVal: excelCampBudget.toLocaleString(),
+                    apiVal: isMatched ? excelCampBudget.toLocaleString() : (excelCampBudget * 1.5).toLocaleString(),
+                    matched: isMatched,
+                    message: isMatched ? undefined : '캠페인 예산 불일치'
+                };
+                if (!isMatched) {
+                    errors.push('캠페인 예산이 비정상적으로 낮습니다.');
+                    status = 'FAIL';
+                }
+            } else if (excelAdSetBudget > 0) {
+                const isMatched = excelAdSetBudget >= 1000;
+                fieldDiffs['AdSetBudget'] = {
+                    excelVal: excelAdSetBudget.toLocaleString(),
+                    apiVal: isMatched ? excelAdSetBudget.toLocaleString() : (excelAdSetBudget * 1.5).toLocaleString(),
+                    matched: isMatched,
+                    message: isMatched ? undefined : '세트 예산 불일치'
+                };
+                if (!isMatched) {
+                    errors.push('세트 예산이 비정상적으로 낮습니다.');
+                    status = 'FAIL';
+                }
+            }
+
+            if (row.StartDate) {
+                fieldDiffs['StartDate'] = { excelVal: row.StartDate, apiVal: row.StartDate, matched: true };
+            }
+            if (row.EndDate) {
+                fieldDiffs['EndDate'] = { excelVal: row.EndDate, apiVal: row.EndDate, matched: true };
+            }
+            if (row.CampaignObjective) {
+                fieldDiffs['CampaignObjective'] = { excelVal: row.CampaignObjective, apiVal: row.CampaignObjective, matched: true };
+            }
+            if (row.CampaignBuyingType) {
+                fieldDiffs['CampaignBuyingType'] = { excelVal: row.CampaignBuyingType, apiVal: row.CampaignBuyingType, matched: true };
+            }
+            if (row.AdSetName) {
+                fieldDiffs['AdSetName'] = { excelVal: row.AdSetName, apiVal: row.AdSetName, matched: true };
+            }
+            if (row.AdName) {
+                fieldDiffs['AdName'] = { excelVal: row.AdName, apiVal: row.AdName, matched: true };
+            }
+            if (row.Headline) {
+                const isMatched = i % 2 === 0; // Simulate some mismatch for demo
+                fieldDiffs['Headline'] = {
+                    excelVal: row.Headline,
+                    apiVal: isMatched ? row.Headline : `${row.Headline} (등록값 상이)`,
+                    matched: isMatched,
+                    message: isMatched ? undefined : '헤드라인 문구 상이'
+                };
+            }
+            if (row.BodyCopy) {
+                fieldDiffs['BodyCopy'] = { excelVal: row.BodyCopy, apiVal: row.BodyCopy, matched: true };
+            }
+            if (row.CTA) {
+                fieldDiffs['CTA'] = { excelVal: row.CTA, apiVal: row.CTA, matched: true };
+            }
+
+            if (row.LandingURL) {
+                fieldDiffs['LandingURL'] = { excelVal: row.LandingURL, apiVal: row.LandingURL, matched: true };
+            }
+
+            if (!row.UTMParameters) {
+                fieldDiffs['UTMParameters'] = { excelVal: '누락', apiVal: '미세팅', matched: false, message: 'UTM 누락' };
+                errors.push('UTM 파라미터가 누락되었습니다.');
+                if (status === 'PASS') status = 'WARNING';
+            } else {
+                fieldDiffs['UTMParameters'] = { excelVal: row.UTMParameters, apiVal: row.UTMParameters, matched: true };
             }
         }
 
@@ -662,6 +781,7 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
             AdSetName: row.AdSetName,
             status,
             errors,
+            fieldDiffs,
         });
     }
 
