@@ -703,13 +703,14 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
                             <thead className="bg-zinc-100 dark:bg-zinc-800/80 text-zinc-600 dark:text-zinc-400 sticky top-0 border-b border-zinc-200 dark:border-zinc-800 z-10 shadow-sm">
                                 <tr>
                                     <th className="px-4 py-3 font-medium text-center bg-zinc-100 dark:bg-zinc-800/80">No</th>
-                                    <th className="px-4 py-3 font-medium bg-zinc-100 dark:bg-zinc-800/80">검수 결과</th>
+                                    <th className="px-4 py-3 font-medium bg-zinc-100 dark:bg-zinc-800/80 text-center">검수 결과</th>
                                     <th className="px-4 py-3 font-medium bg-zinc-200/50 dark:bg-zinc-700/50">매체</th>
                                     <th className="px-4 py-3 font-medium bg-zinc-200/50 dark:bg-zinc-700/50">팀명</th>
                                     <th className="px-4 py-3 font-medium bg-zinc-200/50 dark:bg-zinc-700/50">계정 ID</th>
                                     <th className="px-4 py-3 font-medium bg-blue-50 dark:bg-blue-900/20">캠페인 ID</th>
                                     <th className="px-4 py-3 font-medium bg-blue-50 dark:bg-blue-900/20">캠페인명</th>
                                     {viewMode === 'ver1' && <>
+                                        <th className="px-4 py-3 font-medium bg-blue-50 dark:bg-blue-900/20 text-center">통화</th>
                                         <th className="px-4 py-3 font-medium bg-blue-50 dark:bg-blue-900/20 text-right">캠페인 일 예산</th>
                                         <th className="px-4 py-3 font-medium bg-blue-50 dark:bg-blue-900/20 text-right">캠페인 예산</th>
                                         <th className="px-4 py-3 font-medium bg-zinc-200/50 dark:bg-zinc-700/50">시작일</th>
@@ -765,7 +766,13 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
 
                                             {viewMode === 'ver1' && <>
                                                 <td className="px-4 py-3 bg-blue-50/20 dark:bg-blue-900/10">
-                                                    {renderDiffCell(row.CampaignLifetimeBudget || row.CampaignDailyBudget, 'CampaignBudget', res, true)}
+                                                    {renderDiffCell(row.Currency, 'Currency', res)}
+                                                </td>
+                                                <td className="px-4 py-3 bg-blue-50/20 dark:bg-blue-900/10">
+                                                    {renderDiffCell(row.CampaignDailyBudget, 'CampaignDailyBudget', res, true)}
+                                                </td>
+                                                <td className="px-4 py-3 bg-blue-50/20 dark:bg-blue-900/10">
+                                                    {renderDiffCell(row.CampaignLifetimeBudget, 'CampaignLifetimeBudget', res, true)}
                                                 </td>
                                                 <td className="px-4 py-3 bg-zinc-50/50 dark:bg-zinc-800/30">
                                                     {renderDiffCell(row.StartDate, 'StartDate', res)}
@@ -779,7 +786,10 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
 
                                             {viewMode === 'ver1' && <>
                                                 <td className="px-4 py-3 bg-indigo-50/20 dark:bg-indigo-900/10">
-                                                    {renderDiffCell(row.AdSetLifetimeBudget || row.AdSetDailyBudget, 'AdSetBudget', res, true)}
+                                                    {renderDiffCell(row.AdSetDailyBudget, 'AdSetDailyBudget', res, true)}
+                                                </td>
+                                                <td className="px-4 py-3 bg-indigo-50/20 dark:bg-indigo-900/10">
+                                                    {renderDiffCell(row.AdSetLifetimeBudget, 'AdSetLifetimeBudget', res, true)}
                                                 </td>
                                                 <td className="px-4 py-3 bg-blue-50/20 dark:bg-blue-900/10">
                                                     {renderDiffCell(row.CampaignObjective, 'CampaignObjective', res)}
