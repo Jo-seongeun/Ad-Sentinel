@@ -799,7 +799,9 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
                                                 </td>
                                             </>}
 
-                                            <td className="px-4 py-3 font-semibold text-zinc-900 dark:text-zinc-200 max-w-[150px] truncate bg-emerald-50/20 dark:bg-emerald-900/10">{row.AdName}</td>
+                                            <td className="px-4 py-3 bg-emerald-50/20 dark:bg-emerald-900/10">
+                                                {renderDiffCell(row.AdName, 'AdName', res)}
+                                            </td>
 
                                             {viewMode === 'ver2' && <>
                                                 <td className="px-4 py-3 bg-violet-50/20 dark:bg-violet-900/10">

@@ -333,19 +333,22 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                 } else {
                     fieldDiffs['AdSetName'] = { excelVal: row.AdSetName, apiVal: liveAdSet.name || row.AdSetName, matched: true };
 
-                    // Currency Check
-                    if (row.Currency) {
-                        const safeCurrency = row.Currency.toUpperCase().trim();
-                        const liveCurrency = (cache.currency || 'KRW').toUpperCase();
-                        const matched = safeCurrency === liveCurrency;
-                        fieldDiffs['Currency'] = { excelVal: safeCurrency, apiVal: liveCurrency, matched, message: matched ? undefined : '통화 불일치' };
-                        if (!matched) {
-                            errors.push(`통화 불일치 (기획안: ${safeCurrency}, 매체: ${liveCurrency})`);
-                            status = 'FAIL';
-                        }
+                    // 1. Currency Check
+                    const safeCurrency = row.Currency ? row.Currency.toUpperCase().trim() : '';
+                    const liveCurrency = (cache.currency || 'KRW').toUpperCase();
+                    const currencyMatched = !safeCurrency || safeCurrency === liveCurrency;
+                    fieldDiffs['Currency'] = {
+                        excelVal: safeCurrency || '-',
+                        apiVal: liveCurrency,
+                        matched: currencyMatched,
+                        message: currencyMatched ? undefined : '통화 불일치'
+                    };
+                    if (safeCurrency && !currencyMatched) {
+                        errors.push(`통화 불일치 (기획안: ${safeCurrency}, 매체: ${liveCurrency})`);
+                        status = 'FAIL';
                     }
 
-                    // Budget Check (CBO & ABO)
+                    // 2. Budget Check (CBO & ABO)
                     const excelCampDaily = Number(String(row.CampaignDailyBudget || '').replace(/,/g, '').replace(/[^0-9.]/g, '').trim()) || 0;
                     const excelCampLifetime = Number(String(row.CampaignLifetimeBudget || '').replace(/,/g, '').replace(/[^0-9.]/g, '').trim()) || 0;
 
@@ -360,224 +363,246 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                     const liveAdSetLifetime = Number(liveAdSet.lifetime_budget) || 0;
                     const liveAdSetNormalized = liveAdSetDaily || liveAdSetLifetime || 0;
 
-                    if (excelCampDaily > 0) {
-                        const isMatched = liveCampDaily > 0 && Math.abs(liveCampDaily - excelCampDaily) <= (excelCampDaily * 0.1);
-                        fieldDiffs['CampaignDailyBudget'] = {
-                            excelVal: excelCampDaily.toLocaleString(),
-                            apiVal: liveCampDaily > 0 ? liveCampDaily.toLocaleString() : (liveCampNormalized > 0 ? liveCampNormalized.toLocaleString() : '0'),
-                            matched: isMatched,
-                            message: isMatched ? undefined : '캠페인 일 예산 불일치'
-                        };
-                        if (!isMatched) {
-                            errors.push(`캠페인 일 예산 불일치 (기획안: ${excelCampDaily.toLocaleString()}, 매체: ${liveCampDaily.toLocaleString()})`);
-                            status = 'FAIL';
-                        }
-                    }
-                    if (excelCampLifetime > 0) {
-                        const isMatched = liveCampLifetime > 0 && Math.abs(liveCampLifetime - excelCampLifetime) <= (excelCampLifetime * 0.1);
-                        fieldDiffs['CampaignLifetimeBudget'] = {
-                            excelVal: excelCampLifetime.toLocaleString(),
-                            apiVal: liveCampLifetime > 0 ? liveCampLifetime.toLocaleString() : (liveCampNormalized > 0 ? liveCampNormalized.toLocaleString() : '0'),
-                            matched: isMatched,
-                            message: isMatched ? undefined : '캠페인 예산 불일치'
-                        };
-                        if (!isMatched) {
-                            errors.push(`캠페인 예산 불일치 (기획안: ${excelCampLifetime.toLocaleString()}, 매체: ${liveCampLifetime.toLocaleString()})`);
-                            status = 'FAIL';
-                        }
+                    const campDailyMatched = excelCampDaily > 0 ? (liveCampDaily > 0 && Math.abs(liveCampDaily - excelCampDaily) <= (excelCampDaily * 0.1)) : true;
+                    fieldDiffs['CampaignDailyBudget'] = {
+                        excelVal: excelCampDaily > 0 ? excelCampDaily.toLocaleString() : '-',
+                        apiVal: liveCampDaily > 0 ? liveCampDaily.toLocaleString() : (liveCampNormalized > 0 ? liveCampNormalized.toLocaleString() : '-'),
+                        matched: campDailyMatched,
+                        message: campDailyMatched ? undefined : '캠페인 일 예산 불일치'
+                    };
+                    if (excelCampDaily > 0 && !campDailyMatched) {
+                        errors.push(`캠페인 일 예산 불일치 (기획안: ${excelCampDaily.toLocaleString()}, 매체: ${liveCampDaily.toLocaleString()})`);
+                        status = 'FAIL';
                     }
 
-                    if (excelAdSetDaily > 0) {
-                        const isMatched = liveAdSetDaily > 0 && Math.abs(liveAdSetDaily - excelAdSetDaily) <= (excelAdSetDaily * 0.1);
-                        fieldDiffs['AdSetDailyBudget'] = {
-                            excelVal: excelAdSetDaily.toLocaleString(),
-                            apiVal: liveAdSetDaily > 0 ? liveAdSetDaily.toLocaleString() : (liveAdSetNormalized > 0 ? liveAdSetNormalized.toLocaleString() : '0'),
-                            matched: isMatched,
-                            message: isMatched ? undefined : '세트 일 예산 불일치'
-                        };
-                        if (!isMatched) {
-                            errors.push(`세트 일 예산 불일치 (기획안: ${excelAdSetDaily.toLocaleString()}, 매체: ${liveAdSetDaily.toLocaleString()})`);
-                            status = 'FAIL';
-                        }
-                    }
-                    if (excelAdSetLifetime > 0) {
-                        const isMatched = liveAdSetLifetime > 0 && Math.abs(liveAdSetLifetime - excelAdSetLifetime) <= (excelAdSetLifetime * 0.1);
-                        fieldDiffs['AdSetLifetimeBudget'] = {
-                            excelVal: excelAdSetLifetime.toLocaleString(),
-                            apiVal: liveAdSetLifetime > 0 ? liveAdSetLifetime.toLocaleString() : (liveAdSetNormalized > 0 ? liveAdSetNormalized.toLocaleString() : '0'),
-                            matched: isMatched,
-                            message: isMatched ? undefined : '세트 예산 불일치'
-                        };
-                        if (!isMatched) {
-                            errors.push(`세트 예산 불일치 (기획안: ${excelAdSetLifetime.toLocaleString()}, 매체: ${liveAdSetLifetime.toLocaleString()})`);
-                            status = 'FAIL';
-                        }
+                    const campLifeMatched = excelCampLifetime > 0 ? (liveCampLifetime > 0 && Math.abs(liveCampLifetime - excelCampLifetime) <= (excelCampLifetime * 0.1)) : true;
+                    fieldDiffs['CampaignLifetimeBudget'] = {
+                        excelVal: excelCampLifetime > 0 ? excelCampLifetime.toLocaleString() : '-',
+                        apiVal: liveCampLifetime > 0 ? liveCampLifetime.toLocaleString() : (liveCampNormalized > 0 ? liveCampNormalized.toLocaleString() : '-'),
+                        matched: campLifeMatched,
+                        message: campLifeMatched ? undefined : '캠페인 예산 불일치'
+                    };
+                    if (excelCampLifetime > 0 && !campLifeMatched) {
+                        errors.push(`캠페인 예산 불일치 (기획안: ${excelCampLifetime.toLocaleString()}, 매체: ${liveCampLifetime.toLocaleString()})`);
+                        status = 'FAIL';
                     }
 
-                    // Campaign Dates
+                    const adsetDailyMatched = excelAdSetDaily > 0 ? (liveAdSetDaily > 0 && Math.abs(liveAdSetDaily - excelAdSetDaily) <= (excelAdSetDaily * 0.1)) : true;
+                    fieldDiffs['AdSetDailyBudget'] = {
+                        excelVal: excelAdSetDaily > 0 ? excelAdSetDaily.toLocaleString() : '-',
+                        apiVal: liveAdSetDaily > 0 ? liveAdSetDaily.toLocaleString() : (liveAdSetNormalized > 0 ? liveAdSetNormalized.toLocaleString() : '-'),
+                        matched: adsetDailyMatched,
+                        message: adsetDailyMatched ? undefined : '세트 일 예산 불일치'
+                    };
+                    if (excelAdSetDaily > 0 && !adsetDailyMatched) {
+                        errors.push(`세트 일 예산 불일치 (기획안: ${excelAdSetDaily.toLocaleString()}, 매체: ${liveAdSetDaily.toLocaleString()})`);
+                        status = 'FAIL';
+                    }
+
+                    const adsetLifeMatched = excelAdSetLifetime > 0 ? (liveAdSetLifetime > 0 && Math.abs(liveAdSetLifetime - excelAdSetLifetime) <= (excelAdSetLifetime * 0.1)) : true;
+                    fieldDiffs['AdSetLifetimeBudget'] = {
+                        excelVal: excelAdSetLifetime > 0 ? excelAdSetLifetime.toLocaleString() : '-',
+                        apiVal: liveAdSetLifetime > 0 ? liveAdSetLifetime.toLocaleString() : (liveAdSetNormalized > 0 ? liveAdSetNormalized.toLocaleString() : '-'),
+                        matched: adsetLifeMatched,
+                        message: adsetLifeMatched ? undefined : '세트 예산 불일치'
+                    };
+                    if (excelAdSetLifetime > 0 && !adsetLifeMatched) {
+                        errors.push(`세트 예산 불일치 (기획안: ${excelAdSetLifetime.toLocaleString()}, 매체: ${liveAdSetLifetime.toLocaleString()})`);
+                        status = 'FAIL';
+                    }
+
+                    // 3. Campaign Dates
                     const normalizeDate = (d: string) => d ? d.substring(0, 10).replace(/[^0-9-]/g, '') : '';
-                    if (row.StartDate) {
-                        const metaStart = normalizeDate(liveAdSet.campaign?.start_time || '');
-                        const excelStart = normalizeDate(row.StartDate);
-                        const isMatched = metaStart === excelStart || (liveAdSet.campaign?.start_time && liveAdSet.campaign.start_time.includes(excelStart));
-                        fieldDiffs['StartDate'] = { excelVal: excelStart, apiVal: metaStart || '미설정', matched: isMatched, message: isMatched ? undefined : '시작일 불일치' };
-                        if (!isMatched) {
-                            errors.push(`시작일 불일치 (기획안: ${excelStart}, 매체: ${metaStart})`);
-                            status = 'FAIL';
-                        }
-                    }
-                    if (row.EndDate) {
-                        const metaStop = normalizeDate(liveAdSet.campaign?.stop_time || '');
-                        const excelStop = normalizeDate(row.EndDate);
-                        const isMatched = metaStop === excelStop || (liveAdSet.campaign?.stop_time && liveAdSet.campaign.stop_time.includes(excelStop));
-                        fieldDiffs['EndDate'] = { excelVal: excelStop, apiVal: metaStop || '미설정', matched: isMatched, message: isMatched ? undefined : '종료일 불일치' };
-                        if (!isMatched) {
-                            errors.push(`종료일 불일치 (기획안: ${excelStop}, 매체: ${metaStop})`);
-                            status = 'FAIL';
-                        }
+                    const metaStart = normalizeDate(liveAdSet.campaign?.start_time || '');
+                    const excelStart = normalizeDate(row.StartDate || '');
+                    const startMatched = !excelStart || metaStart === excelStart || (liveAdSet.campaign?.start_time && liveAdSet.campaign.start_time.includes(excelStart));
+                    fieldDiffs['StartDate'] = {
+                        excelVal: excelStart || '-',
+                        apiVal: metaStart || '-',
+                        matched: startMatched,
+                        message: startMatched ? undefined : '시작일 불일치'
+                    };
+                    if (excelStart && !startMatched) {
+                        errors.push(`시작일 불일치 (기획안: ${excelStart}, 매체: ${metaStart})`);
+                        status = 'FAIL';
                     }
 
-                    // Campaign Objectives & Buying Type
-                    if (row.CampaignObjective) {
-                        const excelKr = getKrName(row.CampaignObjective, 'META', 'objective');
-                        const liveKr = getKrName(liveAdSet.campaign?.objective, 'META', 'objective');
-                        const isMatched = liveAdSet.campaign?.objective === row.CampaignObjective;
-                        fieldDiffs['CampaignObjective'] = { excelVal: excelKr, apiVal: liveKr, matched: isMatched, message: isMatched ? undefined : '캠페인 목적 불일치' };
-                        if (!isMatched) {
-                            errors.push(`캠페인 목적 불일치 (기획안: ${excelKr}, 매체: ${liveKr})`);
-                            status = 'FAIL';
-                        }
-                    }
-                    if (row.CampaignBuyingType) {
-                        const excelKr = getKrName(row.CampaignBuyingType, 'META', 'buying_type');
-                        const liveKr = getKrName(liveAdSet.campaign?.buying_type, 'META', 'buying_type');
-                        const isMatched = liveAdSet.campaign?.buying_type === row.CampaignBuyingType;
-                        fieldDiffs['CampaignBuyingType'] = { excelVal: excelKr, apiVal: liveKr, matched: isMatched, message: isMatched ? undefined : '구매 유형 불일치' };
-                        if (!isMatched) {
-                            errors.push(`구매 유형 불일치 (기획안: ${excelKr}, 매체: ${liveKr})`);
-                            status = 'FAIL';
-                        }
+                    const metaStop = normalizeDate(liveAdSet.campaign?.stop_time || '');
+                    const excelStop = normalizeDate(row.EndDate || '');
+                    const stopMatched = !excelStop || metaStop === excelStop || (liveAdSet.campaign?.stop_time && liveAdSet.campaign.stop_time.includes(excelStop));
+                    fieldDiffs['EndDate'] = {
+                        excelVal: excelStop || '-',
+                        apiVal: metaStop || '-',
+                        matched: stopMatched,
+                        message: stopMatched ? undefined : '종료일 불일치'
+                    };
+                    if (excelStop && !stopMatched) {
+                        errors.push(`종료일 불일치 (기획안: ${excelStop}, 매체: ${metaStop})`);
+                        status = 'FAIL';
                     }
 
-                    // Optimization & Billing
-                    if (row.AdSetOptimizationGoal) {
-                        const excelKr = getKrName(row.AdSetOptimizationGoal, 'META', 'optimization_goal');
-                        const liveKr = getKrName(liveAdSet.optimization_goal, 'META', 'optimization_goal');
-                        const isMatched = liveAdSet.optimization_goal === row.AdSetOptimizationGoal;
-                        fieldDiffs['AdSetOptimizationGoal'] = { excelVal: excelKr, apiVal: liveKr, matched: isMatched, message: isMatched ? undefined : '최적화 목표 불일치' };
-                        if (!isMatched) {
-                            errors.push(`최적화 목표 불일치 (기획안: ${excelKr}, 매체: ${liveKr})`);
-                            status = 'FAIL';
-                        }
-                    }
-                    if (row.AdSetBillingEvent) {
-                        const excelKr = getKrName(row.AdSetBillingEvent, 'META', 'billing_event');
-                        const liveKr = getKrName(liveAdSet.billing_event, 'META', 'billing_event');
-                        const isMatched = liveAdSet.billing_event === row.AdSetBillingEvent;
-                        fieldDiffs['AdSetBillingEvent'] = { excelVal: excelKr, apiVal: liveKr, matched: isMatched, message: isMatched ? undefined : '과금 기준 불일치' };
-                        if (!isMatched) {
-                            errors.push(`과금 기준 불일치 (기획안: ${excelKr}, 매체: ${liveKr})`);
-                            status = 'FAIL';
-                        }
+                    // 4. Campaign Objectives & Buying Type
+                    const excelObjKr = row.CampaignObjective ? getKrName(row.CampaignObjective, 'META', 'objective') : '-';
+                    const liveObjKr = liveAdSet.campaign?.objective ? getKrName(liveAdSet.campaign.objective, 'META', 'objective') : '-';
+                    const objMatched = !row.CampaignObjective || liveAdSet.campaign?.objective === row.CampaignObjective;
+                    fieldDiffs['CampaignObjective'] = {
+                        excelVal: excelObjKr,
+                        apiVal: liveObjKr,
+                        matched: objMatched,
+                        message: objMatched ? undefined : '캠페인 목적 불일치'
+                    };
+                    if (row.CampaignObjective && !objMatched) {
+                        errors.push(`캠페인 목적 불일치 (기획안: ${excelObjKr}, 매체: ${liveObjKr})`);
+                        status = 'FAIL';
                     }
 
-                    // Pixels & Events
-                    if (row.PixelID) {
-                        const livePixel = liveAdSet.promoted_object?.pixel_id || '없음';
-                        const isMatched = livePixel === row.PixelID;
-                        fieldDiffs['PixelID'] = { excelVal: row.PixelID, apiVal: livePixel, matched: isMatched, message: isMatched ? undefined : '픽셀 ID 불일치' };
-                        if (!isMatched) {
-                            errors.push(`픽셀 ID 불일치 (기획안: ${row.PixelID}, 매체: ${livePixel})`);
-                            status = 'FAIL';
-                        }
-                    }
-                    if (row.CustomEventType) {
-                        const liveEvent = liveAdSet.promoted_object?.custom_event_type || '없음';
-                        const isMatched = liveEvent === row.CustomEventType;
-                        fieldDiffs['CustomEventType'] = { excelVal: row.CustomEventType, apiVal: liveEvent, matched: isMatched, message: isMatched ? undefined : '이벤트 유형 불일치' };
-                        if (!isMatched) {
-                            errors.push(`이벤트 유형 불일치 (기획안: ${row.CustomEventType}, 매체: ${liveEvent})`);
-                            status = 'FAIL';
-                        }
+                    const excelBuyKr = row.CampaignBuyingType ? getKrName(row.CampaignBuyingType, 'META', 'buying_type') : '-';
+                    const liveBuyKr = liveAdSet.campaign?.buying_type ? getKrName(liveAdSet.campaign.buying_type, 'META', 'buying_type') : '-';
+                    const buyMatched = !row.CampaignBuyingType || liveAdSet.campaign?.buying_type === row.CampaignBuyingType;
+                    fieldDiffs['CampaignBuyingType'] = {
+                        excelVal: excelBuyKr,
+                        apiVal: liveBuyKr,
+                        matched: buyMatched,
+                        message: buyMatched ? undefined : '구매 유형 불일치'
+                    };
+                    if (row.CampaignBuyingType && !buyMatched) {
+                        errors.push(`구매 유형 불일치 (기획안: ${excelBuyKr}, 매체: ${liveBuyKr})`);
+                        status = 'FAIL';
                     }
 
-                    // Ad Level Checks (Headline, Body, CTA, Landing URL, UTM)
-                    if (row.AdName) {
-                        const safeAdName = String(row.AdName || '').trim().toLowerCase();
-                        const liveAd = cache.ads.find((a: any) => String(a.name || '').trim().toLowerCase() === safeAdName && a.adset_id === liveAdSet.id);
-                        if (!liveAd) {
+                    // 5. Optimization & Billing
+                    const excelOptKr = row.AdSetOptimizationGoal ? getKrName(row.AdSetOptimizationGoal, 'META', 'optimization_goal') : '-';
+                    const liveOptKr = liveAdSet.optimization_goal ? getKrName(liveAdSet.optimization_goal, 'META', 'optimization_goal') : '-';
+                    const optMatched = !row.AdSetOptimizationGoal || liveAdSet.optimization_goal === row.AdSetOptimizationGoal;
+                    fieldDiffs['AdSetOptimizationGoal'] = {
+                        excelVal: excelOptKr,
+                        apiVal: liveOptKr,
+                        matched: optMatched,
+                        message: optMatched ? undefined : '최적화 목표 불일치'
+                    };
+                    if (row.AdSetOptimizationGoal && !optMatched) {
+                        errors.push(`최적화 목표 불일치 (기획안: ${excelOptKr}, 매체: ${liveOptKr})`);
+                        status = 'FAIL';
+                    }
+
+                    const excelBillKr = row.AdSetBillingEvent ? getKrName(row.AdSetBillingEvent, 'META', 'billing_event') : '-';
+                    const liveBillKr = liveAdSet.billing_event ? getKrName(liveAdSet.billing_event, 'META', 'billing_event') : '-';
+                    const billMatched = !row.AdSetBillingEvent || liveAdSet.billing_event === row.AdSetBillingEvent;
+                    fieldDiffs['AdSetBillingEvent'] = {
+                        excelVal: excelBillKr,
+                        apiVal: liveBillKr,
+                        matched: billMatched,
+                        message: billMatched ? undefined : '과금 기준 불일치'
+                    };
+                    if (row.AdSetBillingEvent && !billMatched) {
+                        errors.push(`과금 기준 불일치 (기획안: ${excelBillKr}, 매체: ${liveBillKr})`);
+                        status = 'FAIL';
+                    }
+
+                    // 6. Pixels & Events
+                    const livePixel = liveAdSet.promoted_object?.pixel_id || '-';
+                    const pixelMatched = !row.PixelID || livePixel === row.PixelID;
+                    fieldDiffs['PixelID'] = {
+                        excelVal: row.PixelID || '-',
+                        apiVal: livePixel,
+                        matched: pixelMatched,
+                        message: pixelMatched ? undefined : '픽셀 ID 불일치'
+                    };
+                    if (row.PixelID && !pixelMatched) {
+                        errors.push(`픽셀 ID 불일치 (기획안: ${row.PixelID}, 매체: ${livePixel})`);
+                        status = 'FAIL';
+                    }
+
+                    const liveEvent = liveAdSet.promoted_object?.custom_event_type || '-';
+                    const eventMatched = !row.CustomEventType || liveEvent === row.CustomEventType;
+                    fieldDiffs['CustomEventType'] = {
+                        excelVal: row.CustomEventType || '-',
+                        apiVal: liveEvent,
+                        matched: eventMatched,
+                        message: eventMatched ? undefined : '이벤트 유형 불일치'
+                    };
+                    if (row.CustomEventType && !eventMatched) {
+                        errors.push(`이벤트 유형 불일치 (기획안: ${row.CustomEventType}, 매체: ${liveEvent})`);
+                        status = 'FAIL';
+                    }
+
+                    // 7. Ad Level Checks (AdName, LandingURL, UTM, Headline, Body, CTA)
+                    const safeAdName = String(row.AdName || '').trim().toLowerCase();
+                    const liveAd = cache.ads.find((a: any) => String(a.name || '').trim().toLowerCase() === safeAdName && a.adset_id === liveAdSet.id);
+                    
+                    if (!liveAd) {
+                        fieldDiffs['AdName'] = { excelVal: row.AdName || '-', apiVal: '없음', matched: false, message: '광고 소재 미존재' };
+                        fieldDiffs['LandingURL'] = { excelVal: row.LandingURL || '-', apiVal: '미확인', matched: false };
+                        fieldDiffs['UTMParameters'] = { excelVal: row.UTMParameters || '-', apiVal: '미확인', matched: false };
+                        fieldDiffs['Headline'] = { excelVal: row.Headline || '-', apiVal: '미확인', matched: false };
+                        fieldDiffs['BodyCopy'] = { excelVal: row.BodyCopy || '-', apiVal: '미확인', matched: false };
+                        fieldDiffs['CTA'] = { excelVal: row.CTA || '-', apiVal: '미확인', matched: false };
+                        if (row.AdName) {
                             errors.push(`매체에 일치하는 광고가 없음 (${row.AdName})`);
                             status = 'FAIL';
-                            fieldDiffs['AdName'] = { excelVal: row.AdName, apiVal: '없음', matched: false, message: '광고 소재 미존재' };
-                        } else {
-                            fieldDiffs['AdName'] = { excelVal: row.AdName, apiVal: liveAd.name || row.AdName, matched: true };
-                            const creative = liveAd.creative || {};
-                            const spec = creative.object_story_spec || {};
-                            const metaLink = spec.link_data?.link || spec.video_data?.call_to_action?.value?.link || "";
+                        }
+                    } else {
+                        fieldDiffs['AdName'] = { excelVal: row.AdName || '-', apiVal: liveAd.name || row.AdName, matched: true };
+                        const creative = liveAd.creative || {};
+                        const spec = creative.object_story_spec || {};
+                        const metaLink = spec.link_data?.link || spec.video_data?.call_to_action?.value?.link || "";
 
-                            const normalizeUrl = (url: string) => {
-                                if (!url) return "";
-                                try {
-                                    const u = new URL(url);
-                                    return (u.origin + u.pathname).replace(/\/$/, '').toLowerCase();
-                                } catch {
-                                    return url.split('?')[0].replace(/\/$/, '').toLowerCase();
-                                }
-                            };
-
-                            if (row.LandingURL) {
-                                const normMeta = normalizeUrl(metaLink);
-                                const normExcel = normalizeUrl(row.LandingURL);
-                                const isMatched = Boolean(normMeta && normExcel && normMeta === normExcel);
-                                fieldDiffs['LandingURL'] = {
-                                    excelVal: row.LandingURL,
-                                    apiVal: metaLink || '미설정',
-                                    matched: isMatched,
-                                    message: isMatched ? undefined : (!metaLink ? '랜딩 URL 미세팅' : '랜딩 URL 불일치')
-                                };
-                                if (!isMatched && normMeta && normExcel) {
-                                    errors.push(`랜딩 URL 불일치 (매체: ${metaLink})`);
-                                    status = 'FAIL';
-                                } else if (!metaLink) {
-                                    errors.push(`매체에 랜딩 URL이 세팅되지 않음`);
-                                    status = 'WARNING';
-                                }
+                        const normalizeUrl = (url: string) => {
+                            if (!url) return "";
+                            try {
+                                const u = new URL(url);
+                                return (u.origin + u.pathname).replace(/\/$/, '').toLowerCase();
+                            } catch {
+                                return url.split('?')[0].replace(/\/$/, '').toLowerCase();
                             }
+                        };
 
-                            // UTM Parameter Check
-                            const metaUtm = creative.url_tags || "";
-                            if (row.UTMParameters) {
-                                const isMatched = Boolean(metaUtm && (metaUtm.includes(row.UTMParameters) || metaUtm === row.UTMParameters));
-                                fieldDiffs['UTMParameters'] = {
-                                    excelVal: row.UTMParameters,
-                                    apiVal: metaUtm || '미세팅',
-                                    matched: isMatched,
-                                    message: isMatched ? undefined : 'UTM 파라미터 불일치'
-                                };
-                                if (!isMatched) {
-                                    errors.push(`UTM 파라미터 불일치 (매체: ${metaUtm || '비어있음'})`);
-                                    status = 'FAIL';
-                                }
-                            }
-
-                            // Ver2 Copy Fields (Headline, BodyCopy, CTA)
-                            const liveHeadline = spec.link_data?.name || spec.video_data?.title || '';
-                            const liveBodyCopy = spec.link_data?.message || spec.video_data?.message || '';
-                            const liveCTA = spec.link_data?.call_to_action?.type || spec.video_data?.call_to_action?.type || '';
-
-                            if (row.Headline) {
-                                const isMatched = liveHeadline ? liveHeadline.trim() === row.Headline.trim() : true;
-                                fieldDiffs['Headline'] = { excelVal: row.Headline, apiVal: liveHeadline || row.Headline, matched: isMatched, message: isMatched ? undefined : '헤드라인 문구 상이' };
-                            }
-                            if (row.BodyCopy) {
-                                const isMatched = liveBodyCopy ? liveBodyCopy.trim() === row.BodyCopy.trim() : true;
-                                fieldDiffs['BodyCopy'] = { excelVal: row.BodyCopy, apiVal: liveBodyCopy || row.BodyCopy, matched: isMatched, message: isMatched ? undefined : '본문 카피 문구 상이' };
-                            }
-                            if (row.CTA) {
-                                const isMatched = liveCTA ? liveCTA.trim() === row.CTA.trim() : true;
-                                fieldDiffs['CTA'] = { excelVal: row.CTA, apiVal: liveCTA || row.CTA, matched: isMatched, message: isMatched ? undefined : 'CTA 버튼 상이' };
+                        const normMeta = normalizeUrl(metaLink);
+                        const normExcel = normalizeUrl(row.LandingURL || '');
+                        const landingMatched = Boolean(!row.LandingURL || (normMeta && normExcel && normMeta === normExcel));
+                        fieldDiffs['LandingURL'] = {
+                            excelVal: row.LandingURL || '-',
+                            apiVal: metaLink || '미설정',
+                            matched: landingMatched,
+                            message: landingMatched ? undefined : (!metaLink ? '랜딩 URL 미세팅' : '랜딩 URL 불일치')
+                        };
+                        if (row.LandingURL && !landingMatched) {
+                            if (!metaLink) {
+                                errors.push(`매체에 랜딩 URL이 세팅되지 않음`);
+                                status = 'WARNING';
+                            } else {
+                                errors.push(`랜딩 URL 불일치 (매체: ${metaLink})`);
+                                status = 'FAIL';
                             }
                         }
+
+                        // UTM Parameter Check
+                        const metaUtm = creative.url_tags || "";
+                        const utmMatched = Boolean(!row.UTMParameters || (metaUtm && (metaUtm.includes(row.UTMParameters) || metaUtm === row.UTMParameters)));
+                        fieldDiffs['UTMParameters'] = {
+                            excelVal: row.UTMParameters || '-',
+                            apiVal: metaUtm || '미세팅',
+                            matched: utmMatched,
+                            message: utmMatched ? undefined : 'UTM 파라미터 불일치'
+                        };
+                        if (row.UTMParameters && !utmMatched) {
+                            errors.push(`UTM 파라미터 불일치 (매체: ${metaUtm || '비어있음'})`);
+                            status = 'FAIL';
+                        }
+
+                        // Ver2 Copy Fields (Headline, BodyCopy, CTA)
+                        const liveHeadline = spec.link_data?.name || spec.video_data?.title || '';
+                        const liveBodyCopy = spec.link_data?.message || spec.video_data?.message || '';
+                        const liveCTA = spec.link_data?.call_to_action?.type || spec.video_data?.call_to_action?.type || '';
+
+                        const headMatched = !row.Headline || (liveHeadline ? liveHeadline.trim() === row.Headline.trim() : true);
+                        fieldDiffs['Headline'] = { excelVal: row.Headline || '-', apiVal: liveHeadline || '-', matched: headMatched, message: headMatched ? undefined : '헤드라인 문구 상이' };
+
+                        const bodyMatched = !row.BodyCopy || (liveBodyCopy ? liveBodyCopy.trim() === row.BodyCopy.trim() : true);
+                        fieldDiffs['BodyCopy'] = { excelVal: row.BodyCopy || '-', apiVal: liveBodyCopy || '-', matched: bodyMatched, message: bodyMatched ? undefined : '본문 카피 문구 상이' };
+
+                        const ctaMatched = !row.CTA || (liveCTA ? liveCTA.trim() === row.CTA.trim() : true);
+                        fieldDiffs['CTA'] = { excelVal: row.CTA || '-', apiVal: liveCTA || '-', matched: ctaMatched, message: ctaMatched ? undefined : 'CTA 버튼 상이' };
                     }
                 }
             }
@@ -714,94 +739,66 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                 }
             }
         } else if (!token && !googleAccessToken) {
-            // Mock Crosscheck mode (Populate sample diffs for demonstration)
-            if (row.Currency) {
-                const safeCurrency = row.Currency.toUpperCase().trim();
-                const isMatched = safeCurrency === 'KRW';
-                fieldDiffs['Currency'] = { excelVal: safeCurrency, apiVal: 'KRW', matched: isMatched, message: isMatched ? undefined : '통화 불일치' };
-                if (!isMatched) {
-                    errors.push(`통화 불일치 (기획안: ${safeCurrency}, 매체: KRW)`);
-                    status = 'FAIL';
-                }
-            }
+            // Mock Crosscheck mode (Populate all template diffs for clear UI demonstration)
+            const safeCurrency = row.Currency ? row.Currency.toUpperCase().trim() : 'KRW';
+            fieldDiffs['Currency'] = { excelVal: row.Currency || '-', apiVal: safeCurrency, matched: true };
 
-            if (row.CampaignDailyBudget > 0) {
-                const isMatched = Number(row.CampaignDailyBudget) >= 1000;
-                fieldDiffs['CampaignDailyBudget'] = {
-                    excelVal: Number(row.CampaignDailyBudget).toLocaleString(),
-                    apiVal: Number(row.CampaignDailyBudget).toLocaleString(),
-                    matched: isMatched,
-                    message: isMatched ? undefined : '캠페인 일 예산 불일치'
-                };
-            }
-            if (row.CampaignLifetimeBudget > 0) {
-                const isMatched = Number(row.CampaignLifetimeBudget) >= 1000;
-                fieldDiffs['CampaignLifetimeBudget'] = {
-                    excelVal: Number(row.CampaignLifetimeBudget).toLocaleString(),
-                    apiVal: Number(row.CampaignLifetimeBudget).toLocaleString(),
-                    matched: isMatched,
-                    message: isMatched ? undefined : '캠페인 예산 불일치'
-                };
-            }
-            if (row.AdSetDailyBudget > 0) {
-                const isMatched = Number(row.AdSetDailyBudget) >= 1000;
-                fieldDiffs['AdSetDailyBudget'] = {
-                    excelVal: Number(row.AdSetDailyBudget).toLocaleString(),
-                    apiVal: Number(row.AdSetDailyBudget).toLocaleString(),
-                    matched: isMatched,
-                    message: isMatched ? undefined : '세트 일 예산 불일치'
-                };
-            }
-            if (row.AdSetLifetimeBudget > 0) {
-                const isMatched = Number(row.AdSetLifetimeBudget) >= 1000;
-                fieldDiffs['AdSetLifetimeBudget'] = {
-                    excelVal: Number(row.AdSetLifetimeBudget).toLocaleString(),
-                    apiVal: Number(row.AdSetLifetimeBudget).toLocaleString(),
-                    matched: isMatched,
-                    message: isMatched ? undefined : '세트 예산 불일치'
-                };
-            }
+            fieldDiffs['CampaignDailyBudget'] = {
+                excelVal: row.CampaignDailyBudget > 0 ? Number(row.CampaignDailyBudget).toLocaleString() : '-',
+                apiVal: row.CampaignDailyBudget > 0 ? Number(row.CampaignDailyBudget).toLocaleString() : '-',
+                matched: true
+            };
+            fieldDiffs['CampaignLifetimeBudget'] = {
+                excelVal: row.CampaignLifetimeBudget > 0 ? Number(row.CampaignLifetimeBudget).toLocaleString() : '-',
+                apiVal: row.CampaignLifetimeBudget > 0 ? Number(row.CampaignLifetimeBudget).toLocaleString() : '-',
+                matched: true
+            };
+            fieldDiffs['AdSetDailyBudget'] = {
+                excelVal: row.AdSetDailyBudget > 0 ? Number(row.AdSetDailyBudget).toLocaleString() : '-',
+                apiVal: row.AdSetDailyBudget > 0 ? Number(row.AdSetDailyBudget).toLocaleString() : '-',
+                matched: true
+            };
+            fieldDiffs['AdSetLifetimeBudget'] = {
+                excelVal: row.AdSetLifetimeBudget > 0 ? Number(row.AdSetLifetimeBudget).toLocaleString() : '-',
+                apiVal: row.AdSetLifetimeBudget > 0 ? Number(row.AdSetLifetimeBudget).toLocaleString() : '-',
+                matched: true
+            };
 
-            if (row.StartDate) {
-                fieldDiffs['StartDate'] = { excelVal: row.StartDate, apiVal: row.StartDate, matched: true };
-            }
-            if (row.EndDate) {
-                fieldDiffs['EndDate'] = { excelVal: row.EndDate, apiVal: row.EndDate, matched: true };
-            }
-            if (row.CampaignObjective) {
-                fieldDiffs['CampaignObjective'] = { excelVal: row.CampaignObjective, apiVal: row.CampaignObjective, matched: true };
-            }
-            if (row.CampaignBuyingType) {
-                fieldDiffs['CampaignBuyingType'] = { excelVal: row.CampaignBuyingType, apiVal: row.CampaignBuyingType, matched: true };
-            }
-            if (row.AdSetName) {
-                fieldDiffs['AdSetName'] = { excelVal: row.AdSetName, apiVal: row.AdSetName, matched: true };
-            }
-            if (row.AdName) {
-                fieldDiffs['AdName'] = { excelVal: row.AdName, apiVal: row.AdName, matched: true };
-            }
-            if (row.Headline) {
-                const isMatched = i % 2 === 0; // Simulate some mismatch for demo
-                fieldDiffs['Headline'] = {
-                    excelVal: row.Headline,
-                    apiVal: isMatched ? row.Headline : `${row.Headline} (등록값 상이)`,
-                    matched: isMatched,
-                    message: isMatched ? undefined : '헤드라인 문구 상이'
-                };
-            }
-            if (row.BodyCopy) {
-                fieldDiffs['BodyCopy'] = { excelVal: row.BodyCopy, apiVal: row.BodyCopy, matched: true };
-            }
-            if (row.CTA) {
-                fieldDiffs['CTA'] = { excelVal: row.CTA, apiVal: row.CTA, matched: true };
-            }
+            fieldDiffs['StartDate'] = { excelVal: row.StartDate || '-', apiVal: row.StartDate || '-', matched: true };
+            fieldDiffs['EndDate'] = { excelVal: row.EndDate || '-', apiVal: row.EndDate || '-', matched: true };
 
-            if (row.LandingURL) {
-                fieldDiffs['LandingURL'] = { excelVal: row.LandingURL, apiVal: row.LandingURL, matched: true };
-            }
+            const objKr = row.CampaignObjective ? getKrName(row.CampaignObjective, 'META', 'objective') : '-';
+            fieldDiffs['CampaignObjective'] = { excelVal: objKr, apiVal: objKr, matched: true };
+
+            const buyKr = row.CampaignBuyingType ? getKrName(row.CampaignBuyingType, 'META', 'buying_type') : '-';
+            fieldDiffs['CampaignBuyingType'] = { excelVal: buyKr, apiVal: buyKr, matched: true };
+
+            const optKr = row.AdSetOptimizationGoal ? getKrName(row.AdSetOptimizationGoal, 'META', 'optimization_goal') : '-';
+            fieldDiffs['AdSetOptimizationGoal'] = { excelVal: optKr, apiVal: optKr, matched: true };
+
+            const billKr = row.AdSetBillingEvent ? getKrName(row.AdSetBillingEvent, 'META', 'billing_event') : '-';
+            fieldDiffs['AdSetBillingEvent'] = { excelVal: billKr, apiVal: billKr, matched: true };
+
+            fieldDiffs['PixelID'] = { excelVal: row.PixelID || '-', apiVal: row.PixelID || '-', matched: true };
+            fieldDiffs['CustomEventType'] = { excelVal: row.CustomEventType || '-', apiVal: row.CustomEventType || '-', matched: true };
+
+            fieldDiffs['AdSetName'] = { excelVal: row.AdSetName || '-', apiVal: row.AdSetName || '-', matched: true };
+            fieldDiffs['AdName'] = { excelVal: row.AdName || '-', apiVal: row.AdName || '-', matched: true };
+
+            const isHeadlineMatched = i % 2 === 0;
+            fieldDiffs['Headline'] = {
+                excelVal: row.Headline || '-',
+                apiVal: row.Headline ? (isHeadlineMatched ? row.Headline : `${row.Headline} (등록값 상이)`) : '-',
+                matched: !row.Headline || isHeadlineMatched,
+                message: (!row.Headline || isHeadlineMatched) ? undefined : '헤드라인 문구 상이'
+            };
+
+            fieldDiffs['BodyCopy'] = { excelVal: row.BodyCopy || '-', apiVal: row.BodyCopy || '-', matched: true };
+            fieldDiffs['CTA'] = { excelVal: row.CTA || '-', apiVal: row.CTA || '-', matched: true };
+            fieldDiffs['LandingURL'] = { excelVal: row.LandingURL || '-', apiVal: row.LandingURL || '-', matched: true };
 
             if (!row.UTMParameters) {
-                fieldDiffs['UTMParameters'] = { excelVal: '누락', apiVal: '미세팅', matched: false, message: 'UTM 누락' };
+                fieldDiffs['UTMParameters'] = { excelVal: '-', apiVal: '미세팅', matched: false, message: 'UTM 누락' };
                 errors.push('UTM 파라미터가 누락되었습니다.');
                 if (status === 'PASS') status = 'WARNING';
             } else {
