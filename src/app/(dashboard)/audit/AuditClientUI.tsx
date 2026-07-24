@@ -79,6 +79,7 @@ export interface FieldDiff {
     matched: boolean;
     status?: 'PASS' | 'FAIL' | 'WARNING';
     message?: string;
+    isNoExcelInput?: boolean;
 }
 
 export interface AuditResult {
@@ -403,6 +404,7 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
         const excelText = diff.excelVal || (isNumberFormatter && typeof excelValue === 'number' && excelValue > 0 ? excelValue.toLocaleString() : String(excelValue || '-'));
         const apiText = diff.apiVal || '-';
 
+        // 1. 불일치 (기획안과 매체 값이 서로 다른 경우)
         if (!diff.matched) {
             return (
                 <div className="p-2 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 text-xs my-0.5 whitespace-normal min-w-[160px] max-w-[240px] shadow-sm">
@@ -421,6 +423,38 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
             );
         }
 
+        // 2. 엑셀 기획안에는 내용이 없고(-), 실제 매체 데이터에는 값이 존재하는 경우
+        const isNoExcelInput = diff.isNoExcelInput || ((excelText === '-' || excelText === '미입력' || excelText === '') && apiText !== '-' && apiText !== '' && apiText !== '미세팅');
+        if (isNoExcelInput) {
+            return (
+                <div className="py-1 text-xs whitespace-normal min-w-[140px] max-w-[220px]">
+                    <div className="text-[11px] text-zinc-400 dark:text-zinc-500 leading-snug">
+                        <span className="text-[10px] text-zinc-400 font-semibold">계획:</span> -
+                    </div>
+                    <div className="text-[10px] text-amber-600 dark:text-amber-400 font-medium leading-snug flex items-center gap-1 mt-0.5">
+                        <span className="truncate"><span className="text-zinc-400">실제:</span> {apiText}</span>
+                        <span className="text-[9px] bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 px-1 py-0.2 rounded font-bold shrink-0">➖ 업로드 내용 없음</span>
+                    </div>
+                </div>
+            );
+        }
+
+        // 3. 기획안과 매체 데이터 둘 다 비어있는 경우
+        if ((excelText === '-' || excelText === '') && (apiText === '-' || apiText === '' || apiText === '미세팅')) {
+            return (
+                <div className="py-1 text-xs whitespace-normal min-w-[100px]">
+                    <div className="text-[11px] text-zinc-400 dark:text-zinc-500 leading-snug">
+                        <span className="text-[10px] text-zinc-400 font-semibold">계획:</span> -
+                    </div>
+                    <div className="text-[10px] text-zinc-400 dark:text-zinc-500 font-medium leading-snug flex items-center gap-1 mt-0.5">
+                        <span><span className="text-zinc-400">실제:</span> -</span>
+                        <span className="text-[9px] bg-zinc-100 dark:bg-zinc-800 text-zinc-500 px-1 py-0.2 rounded font-bold shrink-0">미세팅</span>
+                    </div>
+                </div>
+            );
+        }
+
+        // 4. 정상 일치
         return (
             <div className="py-1 text-xs whitespace-normal min-w-[140px] max-w-[220px]">
                 <div className="text-[11px] text-zinc-700 dark:text-zinc-300 leading-snug">

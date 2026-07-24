@@ -425,8 +425,6 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                     if (excelStart && !startMatched) {
                         errors.push(`시작일 불일치 (기획안: ${excelStart}, 매체: ${metaStart})`);
                         status = 'FAIL';
-                    }
-
                     const metaStop = normalizeDate(liveAdSet.campaign?.stop_time || '');
                     const excelStop = normalizeDate(row.EndDate || '');
                     const stopMatched = !excelStop || metaStop === excelStop || (liveAdSet.campaign?.stop_time && liveAdSet.campaign.stop_time.includes(excelStop));
@@ -444,12 +442,14 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                     // 4. Campaign Objectives & Buying Type
                     const excelObjKr = row.CampaignObjective ? getKrName(row.CampaignObjective, 'META', 'objective') : '-';
                     const liveObjKr = liveAdSet.campaign?.objective ? getKrName(liveAdSet.campaign.objective, 'META', 'objective') : '-';
-                    const objMatched = !row.CampaignObjective || liveAdSet.campaign?.objective === row.CampaignObjective;
+                    const objMatched = row.CampaignObjective ? liveAdSet.campaign?.objective === row.CampaignObjective : true;
+                    const isNoExcelInputObj = !row.CampaignObjective && Boolean(liveAdSet.campaign?.objective);
                     fieldDiffs['CampaignObjective'] = {
                         excelVal: excelObjKr,
                         apiVal: liveObjKr,
                         matched: objMatched,
-                        message: objMatched ? undefined : '캠페인 목적 불일치'
+                        isNoExcelInput: isNoExcelInputObj,
+                        message: (row.CampaignObjective && !objMatched) ? '캠페인 목적 불일치' : undefined
                     };
                     if (row.CampaignObjective && !objMatched) {
                         errors.push(`캠페인 목적 불일치 (기획안: ${excelObjKr}, 매체: ${liveObjKr})`);
@@ -458,12 +458,14 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
 
                     const excelBuyKr = row.CampaignBuyingType ? getKrName(row.CampaignBuyingType, 'META', 'buying_type') : '-';
                     const liveBuyKr = liveAdSet.campaign?.buying_type ? getKrName(liveAdSet.campaign.buying_type, 'META', 'buying_type') : '-';
-                    const buyMatched = !row.CampaignBuyingType || liveAdSet.campaign?.buying_type === row.CampaignBuyingType;
+                    const buyMatched = row.CampaignBuyingType ? liveAdSet.campaign?.buying_type === row.CampaignBuyingType : true;
+                    const isNoExcelInputBuy = !row.CampaignBuyingType && Boolean(liveAdSet.campaign?.buying_type);
                     fieldDiffs['CampaignBuyingType'] = {
                         excelVal: excelBuyKr,
                         apiVal: liveBuyKr,
                         matched: buyMatched,
-                        message: buyMatched ? undefined : '구매 유형 불일치'
+                        isNoExcelInput: isNoExcelInputBuy,
+                        message: (row.CampaignBuyingType && !buyMatched) ? '구매 유형 불일치' : undefined
                     };
                     if (row.CampaignBuyingType && !buyMatched) {
                         errors.push(`구매 유형 불일치 (기획안: ${excelBuyKr}, 매체: ${liveBuyKr})`);
@@ -473,12 +475,14 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                     // 5. Optimization & Billing
                     const excelOptKr = row.AdSetOptimizationGoal ? getKrName(row.AdSetOptimizationGoal, 'META', 'optimization_goal') : '-';
                     const liveOptKr = liveAdSet.optimization_goal ? getKrName(liveAdSet.optimization_goal, 'META', 'optimization_goal') : '-';
-                    const optMatched = !row.AdSetOptimizationGoal || liveAdSet.optimization_goal === row.AdSetOptimizationGoal;
+                    const optMatched = row.AdSetOptimizationGoal ? liveAdSet.optimization_goal === row.AdSetOptimizationGoal : true;
+                    const isNoExcelInputOpt = !row.AdSetOptimizationGoal && Boolean(liveAdSet.optimization_goal);
                     fieldDiffs['AdSetOptimizationGoal'] = {
                         excelVal: excelOptKr,
                         apiVal: liveOptKr,
                         matched: optMatched,
-                        message: optMatched ? undefined : '최적화 목표 불일치'
+                        isNoExcelInput: isNoExcelInputOpt,
+                        message: (row.AdSetOptimizationGoal && !optMatched) ? '최적화 목표 불일치' : undefined
                     };
                     if (row.AdSetOptimizationGoal && !optMatched) {
                         errors.push(`최적화 목표 불일치 (기획안: ${excelOptKr}, 매체: ${liveOptKr})`);
@@ -487,12 +491,14 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
 
                     const excelBillKr = row.AdSetBillingEvent ? getKrName(row.AdSetBillingEvent, 'META', 'billing_event') : '-';
                     const liveBillKr = liveAdSet.billing_event ? getKrName(liveAdSet.billing_event, 'META', 'billing_event') : '-';
-                    const billMatched = !row.AdSetBillingEvent || liveAdSet.billing_event === row.AdSetBillingEvent;
+                    const billMatched = row.AdSetBillingEvent ? liveAdSet.billing_event === row.AdSetBillingEvent : true;
+                    const isNoExcelInputBill = !row.AdSetBillingEvent && Boolean(liveAdSet.billing_event);
                     fieldDiffs['AdSetBillingEvent'] = {
                         excelVal: excelBillKr,
                         apiVal: liveBillKr,
                         matched: billMatched,
-                        message: billMatched ? undefined : '과금 기준 불일치'
+                        isNoExcelInput: isNoExcelInputBill,
+                        message: (row.AdSetBillingEvent && !billMatched) ? '과금 기준 불일치' : undefined
                     };
                     if (row.AdSetBillingEvent && !billMatched) {
                         errors.push(`과금 기준 불일치 (기획안: ${excelBillKr}, 매체: ${liveBillKr})`);
@@ -501,12 +507,14 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
 
                     // 6. Pixels & Events
                     const livePixel = liveAdSet.promoted_object?.pixel_id || '-';
-                    const pixelMatched = !row.PixelID || livePixel === row.PixelID;
+                    const pixelMatched = row.PixelID ? livePixel === row.PixelID : true;
+                    const isNoExcelInputPixel = !row.PixelID && Boolean(liveAdSet.promoted_object?.pixel_id);
                     fieldDiffs['PixelID'] = {
                         excelVal: row.PixelID || '-',
                         apiVal: livePixel,
                         matched: pixelMatched,
-                        message: pixelMatched ? undefined : '픽셀 ID 불일치'
+                        isNoExcelInput: isNoExcelInputPixel,
+                        message: (row.PixelID && !pixelMatched) ? '픽셀 ID 불일치' : undefined
                     };
                     if (row.PixelID && !pixelMatched) {
                         errors.push(`픽셀 ID 불일치 (기획안: ${row.PixelID}, 매체: ${livePixel})`);
@@ -514,12 +522,14 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                     }
 
                     const liveEvent = liveAdSet.promoted_object?.custom_event_type || '-';
-                    const eventMatched = !row.CustomEventType || liveEvent === row.CustomEventType;
+                    const eventMatched = row.CustomEventType ? liveEvent === row.CustomEventType : true;
+                    const isNoExcelInputEvent = !row.CustomEventType && Boolean(liveAdSet.promoted_object?.custom_event_type);
                     fieldDiffs['CustomEventType'] = {
                         excelVal: row.CustomEventType || '-',
                         apiVal: liveEvent,
                         matched: eventMatched,
-                        message: eventMatched ? undefined : '이벤트 유형 불일치'
+                        isNoExcelInput: isNoExcelInputEvent,
+                        message: (row.CustomEventType && !eventMatched) ? '이벤트 유형 불일치' : undefined
                     };
                     if (row.CustomEventType && !eventMatched) {
                         errors.push(`이벤트 유형 불일치 (기획안: ${row.CustomEventType}, 매체: ${liveEvent})`);
@@ -560,10 +570,12 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                         const normMeta = normalizeUrl(metaLink);
                         const normExcel = normalizeUrl(row.LandingURL || '');
                         const landingMatched = Boolean(!row.LandingURL || (normMeta && normExcel && normMeta === normExcel));
+                        const isNoExcelLanding = !row.LandingURL && Boolean(metaLink);
                         fieldDiffs['LandingURL'] = {
                             excelVal: row.LandingURL || '-',
                             apiVal: metaLink || '미설정',
                             matched: landingMatched,
+                            isNoExcelInput: isNoExcelLanding,
                             message: landingMatched ? undefined : (!metaLink ? '랜딩 URL 미세팅' : '랜딩 URL 불일치')
                         };
                         if (row.LandingURL && !landingMatched) {
@@ -579,10 +591,12 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                         // UTM Parameter Check
                         const metaUtm = creative.url_tags || "";
                         const utmMatched = Boolean(!row.UTMParameters || (metaUtm && (metaUtm.includes(row.UTMParameters) || metaUtm === row.UTMParameters)));
+                        const isNoExcelUtm = !row.UTMParameters && Boolean(metaUtm);
                         fieldDiffs['UTMParameters'] = {
                             excelVal: row.UTMParameters || '-',
                             apiVal: metaUtm || '미세팅',
                             matched: utmMatched,
+                            isNoExcelInput: isNoExcelUtm,
                             message: utmMatched ? undefined : 'UTM 파라미터 불일치'
                         };
                         if (row.UTMParameters && !utmMatched) {
@@ -594,12 +608,6 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                         const liveHeadline = spec.link_data?.name || spec.video_data?.title || '';
                         const liveBodyCopy = spec.link_data?.message || spec.video_data?.message || '';
                         const liveCTA = spec.link_data?.call_to_action?.type || spec.video_data?.call_to_action?.type || '';
-
-                        const headMatched = !row.Headline || (liveHeadline ? liveHeadline.trim() === row.Headline.trim() : true);
-                        fieldDiffs['Headline'] = { excelVal: row.Headline || '-', apiVal: liveHeadline || '-', matched: headMatched, message: headMatched ? undefined : '헤드라인 문구 상이' };
-
-                        const bodyMatched = !row.BodyCopy || (liveBodyCopy ? liveBodyCopy.trim() === row.BodyCopy.trim() : true);
-                        fieldDiffs['BodyCopy'] = { excelVal: row.BodyCopy || '-', apiVal: liveBodyCopy || '-', matched: bodyMatched, message: bodyMatched ? undefined : '본문 카피 문구 상이' };
 
                         const ctaMatched = !row.CTA || (liveCTA ? liveCTA.trim() === row.CTA.trim() : true);
                         fieldDiffs['CTA'] = { excelVal: row.CTA || '-', apiVal: liveCTA || '-', matched: ctaMatched, message: ctaMatched ? undefined : 'CTA 버튼 상이' };
