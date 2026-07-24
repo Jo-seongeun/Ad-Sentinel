@@ -609,11 +609,21 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                         const liveBodyCopy = spec.link_data?.message || spec.video_data?.message || '';
                         const liveCTA = spec.link_data?.call_to_action?.type || spec.video_data?.call_to_action?.type || '';
 
-                        const ctaMatched = !row.CTA || (liveCTA ? liveCTA.trim() === row.CTA.trim() : true);
-                        fieldDiffs['CTA'] = { excelVal: row.CTA || '-', apiVal: liveCTA || '-', matched: ctaMatched, message: ctaMatched ? undefined : 'CTA 버튼 상이' };
+                        const headMatched = row.Headline ? (liveHeadline ? liveHeadline.trim() === row.Headline.trim() : false) : true;
+                        const isNoExcelHead = !row.Headline && Boolean(liveHeadline);
+                        fieldDiffs['Headline'] = { excelVal: row.Headline || '-', apiVal: liveHeadline || '-', matched: headMatched, isNoExcelInput: isNoExcelHead, message: (row.Headline && !headMatched) ? '헤드라인 문구 상이' : undefined };
+
+                        const bodyMatched = row.BodyCopy ? (liveBodyCopy ? liveBodyCopy.trim() === row.BodyCopy.trim() : false) : true;
+                        const isNoExcelBody = !row.BodyCopy && Boolean(liveBodyCopy);
+                        fieldDiffs['BodyCopy'] = { excelVal: row.BodyCopy || '-', apiVal: liveBodyCopy || '-', matched: bodyMatched, isNoExcelInput: isNoExcelBody, message: (row.BodyCopy && !bodyMatched) ? '본문 카피 문구 상이' : undefined };
+
+                        const ctaMatched = row.CTA ? (liveCTA ? liveCTA.trim() === row.CTA.trim() : false) : true;
+                        const isNoExcelCTA = !row.CTA && Boolean(liveCTA);
+                        fieldDiffs['CTA'] = { excelVal: row.CTA || '-', apiVal: liveCTA || '-', matched: ctaMatched, isNoExcelInput: isNoExcelCTA, message: (row.CTA && !ctaMatched) ? 'CTA 버튼 상이' : undefined };
                     }
                 }
             }
+        }
         } else if (status !== 'FAIL' && googleAccessToken && row.Platform.toUpperCase().includes('GOOGLE')) {
             // ─── Google Ads Live Crosscheck ───
             const custId = row.AccountID.replace(/-/g, '');
