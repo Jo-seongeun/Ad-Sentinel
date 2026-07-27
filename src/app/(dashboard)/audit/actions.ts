@@ -31,7 +31,7 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
         .eq('platform', 'META')
         .single();
 
-    const token = tokenData?.access_token;
+    const token = tokenData?.access_token || process.env.META_ACCESS_TOKEN;
 
     // Fetch Google Ads settings
     const { data: googleSettings } = await adminClient
@@ -141,9 +141,9 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                 );
                 const adsetData = await adsetRes.json();
 
-                // Fetch Ads for URL & UTM checking (including asset_feed_spec for Multi-Placement & Dynamic Creatives)
+                // Fetch Ads for URL & UTM checking (including all creative details matching fetch_meta_insights_debug.py)
                 const adsRes = await fetch(
-                    `https://graph.facebook.com/v19.0/act_${act}/ads?fields=name,adset_id,creative{url_tags,object_story_spec,asset_feed_spec},status&limit=500&access_token=${token}`,
+                    `https://graph.facebook.com/v19.0/act_${act}/ads?fields=name,adset_id,creative{id,name,title,body,call_to_action_type,url_tags,object_story_spec,asset_feed_spec,degrees_of_freedom_spec},status&limit=500&access_token=${token}`,
                     { cache: 'no-store' }
                 );
                 const adsData = await adsRes.json();
