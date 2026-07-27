@@ -141,9 +141,9 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                 );
                 const adsetData = await adsetRes.json();
 
-                // Fetch Ads for URL & UTM checking
+                // Fetch Ads for URL & UTM checking (including asset_feed_spec for Multi-Placement & Dynamic Creatives)
                 const adsRes = await fetch(
-                    `https://graph.facebook.com/v19.0/act_${act}/ads?fields=name,adset_id,creative{url_tags,object_story_spec},status&limit=500&access_token=${token}`,
+                    `https://graph.facebook.com/v19.0/act_${act}/ads?fields=name,adset_id,creative{url_tags,object_story_spec,asset_feed_spec},status&limit=500&access_token=${token}`,
                     { cache: 'no-store' }
                 );
                 const adsData = await adsRes.json();
@@ -555,13 +555,33 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                         fieldDiffs['AdName'] = { excelVal: row.AdName || '-', apiVal: liveAd.name || row.AdName, matched: true };
                         const creative = liveAd.creative || {};
                         const spec = creative.object_story_spec || {};
-                        const metaLink = spec.link_data?.link || spec.video_data?.call_to_action?.value?.link || "";
+                        
+                        // Parse Multi-Placement tagged items like "[페이스북 (스토리, 릴스)] https://..." or "[기본 설정] https://..."
+                        interface PlacementItem {
+                            tag: string;
+                            content: string;
+                        }
 
-                        const extractPureUrls = (raw: string): string[] => {
-                            if (!raw) return [];
-                            const matches = raw.match(/https?:\/\/[^\s\r\n\]]+/g);
-                            if (!matches || matches.length === 0) return [raw.trim()];
-                            return matches;
+                        const parseMultiPlacementItems = (rawText: string): PlacementItem[] => {
+                            if (!rawText) return [];
+                            const lines = rawText.split(/[\r\n]+/).map(l => l.trim()).filter(Boolean);
+                            const items: PlacementItem[] = [];
+                            
+                            for (const line of lines) {
+                                const tagMatch = line.match(/^\[([^\]]+)\]\s*(.*)$/);
+                                if (tagMatch) {
+                                    items.push({
+                                        tag: tagMatch[1].trim(),
+                                        content: tagMatch[2].trim()
+                                    });
+                                } else {
+                                    items.push({
+                                        tag: '기본 설정',
+                                        content: line.trim()
+                                    });
+                                }
+                            }
+                            return items;
                         };
 
                         const normalizeUrl = (url: string) => {
@@ -574,52 +594,89 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                             }
                         };
 
-                        const normMeta = normalizeUrl(metaLink);
-                        const excelUrls = extractPureUrls(row.LandingURL || '');
-                        const normExcelUrls = excelUrls.map(u => normalizeUrl(u));
-                        const landingMatched = Boolean(!row.LandingURL || (normMeta && normExcelUrls.some(u => u === normMeta)));
-                        const isNoExcelLanding = !row.LandingURL && Boolean(metaLink);
+                        // Collect all URLs from live Meta API (Primary, Video CTA, Carousel Children, Multi-Placement Asset Feed)
+                        const primaryUrl = spec.link_data?.link || spec.video_data?.call_to_action?.value?.link || "";
+                        const childUrls: string[] = (spec.link_data?.child_attachments || [])
+                            .map((c: any) => c.link)
+                            .filter(Boolean);
+                        const assetFeedUrls: string[] = (creative.asset_feed_spec?.link_urls || [])
+                            .map((l: any) => l.website_url || l.display_url)
+                            .filter(Boolean);
 
-                        fieldDiffs['LandingURL'] = {
-                            excelVal: row.LandingURL || '-',
-                            apiVal: metaLink || '미설정',
-                            matched: landingMatched,
-                            isNoExcelInput: isNoExcelLanding,
-                            message: landingMatched ? undefined : (!metaLink ? '랜딩 URL 미세팅' : '랜딩 URL 불일치')
-                        };
-                        if (row.LandingURL && !landingMatched) {
-                            if (!metaLink) {
-                                errors.push(`매체에 랜딩 URL이 세팅되지 않음`);
-                                status = 'WARNING';
+                        const allLiveUrls = Array.from(new Set([primaryUrl, ...childUrls, ...assetFeedUrls].filter(Boolean)));
+                        const normLiveUrls = allLiveUrls.map(u => normalizeUrl(u));
+
+                        // Multi-Placement Landing URL Crosscheck
+                        const excelPlacementUrls = parseMultiPlacementItems(row.LandingURL || '');
+                        let landingMatched = true;
+                        let unmatchedPlacementMsg = '';
+
+                        if (row.LandingURL) {
+                            if (normLiveUrls.length === 0) {
+                                landingMatched = false;
+                                unmatchedPlacementMsg = '매체에 랜딩 URL 미세팅';
                             } else {
-                                errors.push(`랜딩 URL 불일치 (매체: ${metaLink})`);
-                                status = 'FAIL';
+                                for (const item of excelPlacementUrls) {
+                                    const normTarget = normalizeUrl(item.content);
+                                    const isItemMatched = normLiveUrls.some(liveU => liveU === normTarget);
+                                    if (!isItemMatched) {
+                                        landingMatched = false;
+                                        unmatchedPlacementMsg = `[${item.tag}] 지면 랜딩 URL 불일치`;
+                                        break;
+                                    }
+                                }
                             }
                         }
 
-                        // UTM Parameter Check (Clean bracket tags like [기본 설정])
-                        const cleanUtmString = (raw: string) => {
-                            if (!raw) return "";
-                            return raw.replace(/\[[^\]]+\]/g, '').replace(/[\r\n]+/g, ' ').trim();
+                        const isNoExcelLanding = !row.LandingURL && normLiveUrls.length > 0;
+                        fieldDiffs['LandingURL'] = {
+                            excelVal: row.LandingURL || '-',
+                            apiVal: primaryUrl || (normLiveUrls[0] || '미설정'),
+                            matched: landingMatched,
+                            isNoExcelInput: isNoExcelLanding,
+                            message: landingMatched ? undefined : (unmatchedPlacementMsg || '랜딩 URL 불일치')
                         };
 
-                        const metaUtm = creative.url_tags || "";
-                        const cleanedExcelUtm = cleanUtmString(row.UTMParameters || '');
-                        const utmMatched = Boolean(
-                            !row.UTMParameters ||
-                            (metaUtm && (metaUtm.includes(cleanedExcelUtm) || cleanedExcelUtm.includes(metaUtm) || metaUtm === cleanedExcelUtm))
-                        );
-                        const isNoExcelUtm = !row.UTMParameters && Boolean(metaUtm);
+                        if (row.LandingURL && !landingMatched) {
+                            errors.push(unmatchedPlacementMsg || '랜딩 URL 불일치');
+                            status = 'FAIL';
+                        }
 
+                        // Multi-Placement UTM Parameter Crosscheck
+                        const excelPlacementUtms = parseMultiPlacementItems(row.UTMParameters || '');
+                        const metaUtm = creative.url_tags || "";
+
+                        let utmMatched = true;
+                        let unmatchedUtmMsg = '';
+
+                        if (row.UTMParameters) {
+                            if (!metaUtm) {
+                                utmMatched = false;
+                                unmatchedUtmMsg = '매체에 UTM 파라미터 미세팅';
+                            } else {
+                                for (const item of excelPlacementUtms) {
+                                    const cleanUtm = item.content;
+                                    const isUtmMatch = metaUtm && (metaUtm.includes(cleanUtm) || cleanUtm.includes(metaUtm) || metaUtm === cleanUtm);
+                                    if (!isUtmMatch) {
+                                        utmMatched = false;
+                                        unmatchedUtmMsg = `[${item.tag}] UTM 불일치`;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+
+                        const isNoExcelUtm = !row.UTMParameters && Boolean(metaUtm);
                         fieldDiffs['UTMParameters'] = {
                             excelVal: row.UTMParameters || '-',
                             apiVal: metaUtm || '미세팅',
                             matched: utmMatched,
                             isNoExcelInput: isNoExcelUtm,
-                            message: utmMatched ? undefined : 'UTM 파라미터 불일치'
+                            message: utmMatched ? undefined : (unmatchedUtmMsg || 'UTM 파라미터 불일치')
                         };
+
                         if (row.UTMParameters && !utmMatched) {
-                            errors.push(`UTM 파라미터 불일치 (매체: ${metaUtm || '비어있음'})`);
+                            errors.push(unmatchedUtmMsg || 'UTM 파라미터 불일치');
                             status = 'FAIL';
                         }
 
