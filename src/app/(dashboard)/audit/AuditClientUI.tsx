@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import * as xlsx from 'xlsx';
-import { UploadCloud, CheckCircle2, AlertCircle, Loader2, Download, ShieldCheck, BookOpen, X, ExternalLink, Map } from 'lucide-react';
+import { UploadCloud, CheckCircle2, AlertCircle, Loader2, Download, ShieldCheck, BookOpen, X, ExternalLink, Map, Eye } from 'lucide-react';
 import { crosscheckApiAction } from './actions';
 
 // ─── 22개 컬럼 메타데이터 ───────────────────────────────────────────────────
@@ -100,6 +100,7 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [viewMode, setViewMode] = useState<'ver1' | 'ver2'>('ver1');
     const [showPlacementGuide, setShowPlacementGuide] = useState(false);
+    const [activeDrawerRowIndex, setActiveDrawerRowIndex] = useState<number | null>(null);
 
 
     const downloadTemplate = () => {
@@ -733,60 +734,103 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
                                 </div>
                             </div>
                         )}
-                        <table className="w-full text-left text-xs whitespace-nowrap">
-                            <thead className="bg-zinc-100 dark:bg-zinc-800/80 text-zinc-600 dark:text-zinc-400 sticky top-0 border-b border-zinc-200 dark:border-zinc-800 z-10 shadow-sm">
-                                <tr>
-                                    <th className="px-4 py-3 font-medium text-center bg-zinc-100 dark:bg-zinc-800/80">No</th>
-                                    <th className="px-4 py-3 font-medium bg-zinc-100 dark:bg-zinc-800/80 text-center">검수 결과</th>
-                                    <th className="px-4 py-3 font-medium bg-zinc-200/50 dark:bg-zinc-700/50">매체</th>
-                                    <th className="px-4 py-3 font-medium bg-zinc-200/50 dark:bg-zinc-700/50">팀명</th>
-                                    <th className="px-4 py-3 font-medium bg-zinc-200/50 dark:bg-zinc-700/50">계정 ID</th>
-                                    <th className="px-4 py-3 font-medium bg-blue-50 dark:bg-blue-900/20">캠페인 ID</th>
-                                    <th className="px-4 py-3 font-medium bg-blue-50 dark:bg-blue-900/20">캠페인명</th>
-                                    {viewMode === 'ver1' && <>
-                                        <th className="px-4 py-3 font-medium bg-blue-50 dark:bg-blue-900/20 text-center">통화</th>
-                                        <th className="px-4 py-3 font-medium bg-blue-50 dark:bg-blue-900/20 text-right">캠페인 일 예산</th>
-                                        <th className="px-4 py-3 font-medium bg-blue-50 dark:bg-blue-900/20 text-right">캠페인 예산</th>
-                                        <th className="px-4 py-3 font-medium bg-zinc-200/50 dark:bg-zinc-700/50">시작일</th>
-                                        <th className="px-4 py-3 font-medium bg-zinc-200/50 dark:bg-zinc-700/50">종료일</th>
-                                    </>}
-                                    <th className="px-4 py-3 font-medium bg-indigo-50 dark:bg-indigo-900/20">광고 세트명</th>
-                                    {viewMode === 'ver1' && <>
-                                        <th className="px-4 py-3 font-medium bg-indigo-50 dark:bg-indigo-900/20 text-right">세트 일 예산</th>
-                                        <th className="px-4 py-3 font-medium bg-indigo-50 dark:bg-indigo-900/20 text-right">세트 예산</th>
-                                        <th className="px-4 py-3 font-medium bg-blue-50 dark:bg-blue-900/20">캠페인 목적</th>
-                                        <th className="px-4 py-3 font-medium bg-blue-50 dark:bg-blue-900/20">구매 유형</th>
-                                    </>}
-                                    <th className="px-4 py-3 font-medium bg-emerald-50 dark:bg-emerald-900/20">광고명</th>
-                                    {viewMode === 'ver2' && <>
-                                        <th className="px-4 py-3 font-medium bg-violet-50 dark:bg-violet-900/20">헤드라인</th>
-                                        <th className="px-4 py-3 font-medium bg-violet-50 dark:bg-violet-900/20">본문 카피</th>
-                                        <th className="px-4 py-3 font-medium bg-violet-50 dark:bg-violet-900/20">CTA</th>
-                                    </>}
-                                    <th className="px-4 py-3 font-medium bg-emerald-50 dark:bg-emerald-900/20">랜딩 URL</th>
-                                    <th className="px-4 py-3 font-medium bg-emerald-50 dark:bg-emerald-900/20">UTM 파라미터</th>
-                                    <th className="px-4 py-3 font-medium bg-indigo-50 dark:bg-indigo-900/20">최적화 목표</th>
-                                    <th className="px-4 py-3 font-medium bg-indigo-50 dark:bg-indigo-900/20">과금 기준</th>
-                                    <th className="px-4 py-3 font-medium bg-indigo-50 dark:bg-indigo-900/20">픽셀/이벤트</th>
-                                    <th className="px-4 py-3 font-medium bg-indigo-50 dark:bg-indigo-900/20">이벤트 유형</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-                                {rows.map((row, i) => {
-                                    const res = results?.find(r => r.rowId === i);
-                                    return (
-                                        <tr key={i} className={`hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors ${res?.status === 'FAIL' ? 'bg-rose-50/30 dark:bg-rose-900/10' : res?.status === 'WARNING' ? 'bg-orange-50/20' : ''}`}>
+                        {/* 검수 결과가 있을 경우의 요약 테이블 (results) */}
+                        {results ? (
+                            <table className="w-full text-xs text-left">
+                                <thead className="text-[11px] text-zinc-500 font-semibold bg-zinc-100 dark:bg-zinc-800/80 border-b border-zinc-200 dark:border-zinc-800 uppercase">
+                                    <tr>
+                                        <th className="px-4 py-3 text-center w-12">#</th>
+                                        <th className="px-4 py-3">매체</th>
+                                        <th className="px-4 py-3">팀명</th>
+                                        <th className="px-4 py-3 font-mono">계정 ID</th>
+                                        <th className="px-4 py-3">캠페인명</th>
+                                        <th className="px-4 py-3">광고 세트명</th>
+                                        <th className="px-4 py-3 text-center">검수 결과</th>
+                                        <th className="px-4 py-3 text-center">상세</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                                    {rows.map((row, i) => {
+                                        const res = results.find(r => r.rowId === i);
+                                        return (
+                                            <tr key={i} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
+                                                <td className="px-4 py-3 text-center font-mono text-zinc-400">{i + 1}</td>
+                                                <td className="px-4 py-3">
+                                                    <span className={`px-2 py-0.5 rounded font-bold text-[10px] ${row.Platform?.toLowerCase().includes('meta') ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'}`}>
+                                                        {row.Platform || '미상'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3 font-medium text-zinc-800 dark:text-zinc-200">{row.Team}</td>
+                                                <td className="px-4 py-3 font-mono text-zinc-500 text-[10px]">{row.AccountID}</td>
+                                                <td className="px-4 py-3 font-semibold text-zinc-900 dark:text-zinc-100">{row.CampaignName}</td>
+                                                <td className="px-4 py-3 text-indigo-600 dark:text-indigo-400 font-medium">{row.AdSetName}</td>
+                                                <td className="px-4 py-3 text-center">
+                                                    {res?.status === 'PASS' ? (
+                                                        <span className="inline-flex items-center gap-1 text-emerald-600 font-bold bg-emerald-100 dark:bg-emerald-900/30 px-2.5 py-1 rounded-full text-xs shadow-sm"><CheckCircle2 className="w-3.5 h-3.5" /> PASS</span>
+                                                    ) : res?.status === 'FAIL' ? (
+                                                        <span className="inline-flex items-center gap-1 text-rose-600 font-bold bg-rose-100 dark:bg-rose-900/30 px-2.5 py-1 rounded-full text-xs shadow-sm"><AlertCircle className="w-3.5 h-3.5" /> FAIL</span>
+                                                    ) : (
+                                                        <span className="inline-flex items-center gap-1 text-orange-600 font-bold bg-orange-100 dark:bg-orange-900/30 px-2.5 py-1 rounded-full text-xs shadow-sm"><AlertCircle className="w-3.5 h-3.5" /> WARN</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3 text-center">
+                                                    <button
+                                                        onClick={() => setActiveDrawerRowIndex(i)}
+                                                        className="px-3 py-1 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded text-xs font-bold text-zinc-600 dark:text-zinc-400"
+                                                    >
+                                                        상세
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        ) : (
+                            <table className="w-full text-left text-xs whitespace-nowrap">
+                                <thead className="bg-zinc-100 dark:bg-zinc-800/80 text-zinc-600 dark:text-zinc-400 sticky top-0 border-b border-zinc-200 dark:border-zinc-800 z-10 shadow-sm">
+                                    <tr>
+                                        <th className="px-4 py-3 font-medium text-center bg-zinc-100 dark:bg-zinc-800/80">No</th>
+                                        <th className="px-4 py-3 font-medium bg-zinc-100 dark:bg-zinc-800/80 text-center">검수 결과</th>
+                                        <th className="px-4 py-3 font-medium bg-zinc-200/50 dark:bg-zinc-700/50">매체</th>
+                                        <th className="px-4 py-3 font-medium bg-zinc-200/50 dark:bg-zinc-700/50">팀명</th>
+                                        <th className="px-4 py-3 font-medium bg-zinc-200/50 dark:bg-zinc-700/50">계정 ID</th>
+                                        <th className="px-4 py-3 font-medium bg-blue-50 dark:bg-blue-900/20">캠페인 ID</th>
+                                        <th className="px-4 py-3 font-medium bg-blue-50 dark:bg-blue-900/20">캠페인명</th>
+                                        {viewMode === 'ver1' && <>
+                                            <th className="px-4 py-3 font-medium bg-blue-50 dark:bg-blue-900/20 text-center">통화</th>
+                                            <th className="px-4 py-3 font-medium bg-blue-50 dark:bg-blue-900/20 text-right">캠페인 일 예산</th>
+                                            <th className="px-4 py-3 font-medium bg-blue-50 dark:bg-blue-900/20 text-right">캠페인 예산</th>
+                                            <th className="px-4 py-3 font-medium bg-zinc-200/50 dark:bg-zinc-700/50">시작일</th>
+                                            <th className="px-4 py-3 font-medium bg-zinc-200/50 dark:bg-zinc-700/50">종료일</th>
+                                        </>}
+                                        <th className="px-4 py-3 font-medium bg-indigo-50 dark:bg-indigo-900/20">광고 세트명</th>
+                                        {viewMode === 'ver1' && <>
+                                            <th className="px-4 py-3 font-medium bg-indigo-50 dark:bg-indigo-900/20 text-right">세트 일 예산</th>
+                                            <th className="px-4 py-3 font-medium bg-indigo-50 dark:bg-indigo-900/20 text-right">세트 예산</th>
+                                            <th className="px-4 py-3 font-medium bg-blue-50 dark:bg-blue-900/20">캠페인 목적</th>
+                                            <th className="px-4 py-3 font-medium bg-blue-50 dark:bg-blue-900/20">구매 유형</th>
+                                        </>}
+                                        <th className="px-4 py-3 font-medium bg-emerald-50 dark:bg-emerald-900/20">광고명</th>
+                                        {viewMode === 'ver2' && <>
+                                            <th className="px-4 py-3 font-medium bg-violet-50 dark:bg-violet-900/20">헤드라인</th>
+                                            <th className="px-4 py-3 font-medium bg-violet-50 dark:bg-violet-900/20">본문 카피</th>
+                                            <th className="px-4 py-3 font-medium bg-violet-50 dark:bg-violet-900/20">CTA</th>
+                                        </>}
+                                        <th className="px-4 py-3 font-medium bg-emerald-50 dark:bg-emerald-900/20">랜딩 URL</th>
+                                        <th className="px-4 py-3 font-medium bg-emerald-50 dark:bg-emerald-900/20">UTM 파라미터</th>
+                                        <th className="px-4 py-3 font-medium bg-indigo-50 dark:bg-indigo-900/20">최적화 목표</th>
+                                        <th className="px-4 py-3 font-medium bg-indigo-50 dark:bg-indigo-900/20">과금 기준</th>
+                                        <th className="px-4 py-3 font-medium bg-indigo-50 dark:bg-indigo-900/20">픽셀/이벤트</th>
+                                        <th className="px-4 py-3 font-medium bg-indigo-50 dark:bg-indigo-900/20">이벤트 유형</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                                    {rows.map((row, i) => (
+                                        <tr key={i} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
                                             <td className="px-4 py-3 text-center text-zinc-500 font-mono">{i + 1}</td>
                                             <td className="px-4 py-3 text-center">
-                                                {!results ? (
-                                                    <span className="text-zinc-400">- 대기 -</span>
-                                                ) : res?.status === 'PASS' ? (
-                                                    <span className="inline-flex items-center gap-1 text-emerald-600 font-bold bg-emerald-100 dark:bg-emerald-900/30 px-2.5 py-1 rounded-full text-xs shadow-sm"><CheckCircle2 className="w-3.5 h-3.5" /> PASS</span>
-                                                ) : res?.status === 'FAIL' ? (
-                                                    <span className="inline-flex items-center gap-1 text-rose-600 font-bold bg-rose-100 dark:bg-rose-900/30 px-2.5 py-1 rounded-full text-xs shadow-sm"><AlertCircle className="w-3.5 h-3.5" /> FAIL</span>
-                                                ) : (
-                                                    <span className="inline-flex items-center gap-1 text-orange-600 font-bold bg-orange-100 dark:bg-orange-900/30 px-2.5 py-1 rounded-full text-xs shadow-sm"><AlertCircle className="w-3.5 h-3.5" /> WARN</span>
-                                                )}
+                                                <span className="text-zinc-400 font-medium">- 대기 -</span>
                                             </td>
                                             <td className="px-4 py-3">
                                                 <span className={`px-2 py-0.5 rounded font-bold text-[10px] ${row.Platform?.toLowerCase().includes('meta') ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'}`}>
@@ -799,80 +843,42 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
                                             <td className="px-4 py-3 font-semibold text-zinc-900 dark:text-zinc-200 max-w-[150px] truncate bg-blue-50/20 dark:bg-blue-900/10" title={row.CampaignName}>{row.CampaignName}</td>
 
                                             {viewMode === 'ver1' && <>
-                                                <td className="px-4 py-3 bg-blue-50/20 dark:bg-blue-900/10">
-                                                    {renderDiffCell(row.Currency, 'Currency', res)}
-                                                </td>
-                                                <td className="px-4 py-3 bg-blue-50/20 dark:bg-blue-900/10">
-                                                    {renderDiffCell(row.CampaignDailyBudget, 'CampaignDailyBudget', res, true)}
-                                                </td>
-                                                <td className="px-4 py-3 bg-blue-50/20 dark:bg-blue-900/10">
-                                                    {renderDiffCell(row.CampaignLifetimeBudget, 'CampaignLifetimeBudget', res, true)}
-                                                </td>
-                                                <td className="px-4 py-3 bg-zinc-50/50 dark:bg-zinc-800/30">
-                                                    {renderDiffCell(row.StartDate, 'StartDate', res)}
-                                                </td>
-                                                <td className="px-4 py-3 bg-zinc-50/50 dark:bg-zinc-800/30">
-                                                    {renderDiffCell(row.EndDate, 'EndDate', res)}
-                                                </td>
+                                                <td className="px-4 py-3 text-center font-bold bg-blue-50/20 dark:bg-blue-900/10">{row.Currency || '-'}</td>
+                                                <td className="px-4 py-3 text-right bg-blue-50/20 dark:bg-blue-900/10">{row.CampaignDailyBudget ? row.CampaignDailyBudget.toLocaleString() : '-'}</td>
+                                                <td className="px-4 py-3 text-right bg-blue-50/20 dark:bg-blue-900/10">{row.CampaignLifetimeBudget ? row.CampaignLifetimeBudget.toLocaleString() : '-'}</td>
+                                                <td className="px-4 py-3 bg-zinc-50/50 dark:bg-zinc-800/30">{row.StartDate || '-'}</td>
+                                                <td className="px-4 py-3 bg-zinc-50/50 dark:bg-zinc-800/30">{row.EndDate || '-'}</td>
                                             </>}
 
                                             <td className="px-4 py-3 text-indigo-700 dark:text-indigo-300 font-medium max-w-[150px] truncate bg-indigo-50/20 dark:bg-indigo-900/10" title={row.AdSetName}>{row.AdSetName}</td>
 
                                             {viewMode === 'ver1' && <>
-                                                <td className="px-4 py-3 bg-indigo-50/20 dark:bg-indigo-900/10">
-                                                    {renderDiffCell(row.AdSetDailyBudget, 'AdSetDailyBudget', res, true)}
-                                                </td>
-                                                <td className="px-4 py-3 bg-indigo-50/20 dark:bg-indigo-900/10">
-                                                    {renderDiffCell(row.AdSetLifetimeBudget, 'AdSetLifetimeBudget', res, true)}
-                                                </td>
-                                                <td className="px-4 py-3 bg-blue-50/20 dark:bg-blue-900/10">
-                                                    {renderDiffCell(row.CampaignObjective, 'CampaignObjective', res)}
-                                                </td>
-                                                <td className="px-4 py-3 bg-blue-50/20 dark:bg-blue-900/10">
-                                                    {renderDiffCell(row.CampaignBuyingType, 'CampaignBuyingType', res)}
-                                                </td>
+                                                <td className="px-4 py-3 text-right bg-indigo-50/20 dark:bg-indigo-900/10">{row.AdSetDailyBudget ? row.AdSetDailyBudget.toLocaleString() : '-'}</td>
+                                                <td className="px-4 py-3 text-right bg-indigo-50/20 dark:bg-indigo-900/10">{row.AdSetLifetimeBudget ? row.AdSetLifetimeBudget.toLocaleString() : '-'}</td>
+                                                <td className="px-4 py-3 bg-blue-50/20 dark:bg-blue-900/10">{row.CampaignObjective || '-'}</td>
+                                                <td className="px-4 py-3 bg-blue-50/20 dark:bg-blue-900/10">{row.CampaignBuyingType || '-'}</td>
                                             </>}
 
-                                            <td className="px-4 py-3 bg-emerald-50/20 dark:bg-emerald-900/10">
-                                                {renderDiffCell(row.AdName, 'AdName', res)}
-                                            </td>
+                                            <td className="px-4 py-3 font-semibold text-zinc-900 dark:text-zinc-200 max-w-[150px] truncate bg-emerald-50/20 dark:bg-emerald-900/10">{row.AdName || '-'}</td>
 
                                             {viewMode === 'ver2' && <>
-                                                <td className="px-4 py-3 bg-violet-50/20 dark:bg-violet-900/10">
-                                                    {renderDiffCell(row.Headline, 'Headline', res)}
-                                                </td>
-                                                <td className="px-4 py-3 bg-violet-50/20 dark:bg-violet-900/10">
-                                                    {renderDiffCell(row.BodyCopy, 'BodyCopy', res)}
-                                                </td>
-                                                <td className="px-4 py-3 bg-violet-50/20 dark:bg-violet-900/10">
-                                                    {renderDiffCell(row.CTA, 'CTA', res)}
-                                                </td>
+                                                <td className="px-4 py-3 max-w-[150px] truncate bg-violet-50/20 dark:bg-violet-900/10">{row.Headline || '-'}</td>
+                                                <td className="px-4 py-3 max-w-[150px] truncate bg-violet-50/20 dark:bg-violet-900/10">{row.BodyCopy || '-'}</td>
+                                                <td className="px-4 py-3 bg-violet-50/20 dark:bg-violet-900/10">{row.CTA || '-'}</td>
                                             </>}
 
-                                            <td className="px-4 py-3 bg-emerald-50/20 dark:bg-emerald-900/10">
-                                                {renderDiffCell(row.LandingURL, 'LandingURL', res)}
-                                            </td>
-                                            <td className="px-4 py-3 bg-emerald-50/20 dark:bg-emerald-900/10">
-                                                {renderDiffCell(row.UTMParameters, 'UTMParameters', res)}
-                                            </td>
+                                            <td className="px-4 py-3 max-w-[150px] truncate bg-emerald-50/20 dark:bg-emerald-900/10">{row.LandingURL || '-'}</td>
+                                            <td className="px-4 py-3 max-w-[150px] truncate bg-emerald-50/20 dark:bg-emerald-900/10">{row.UTMParameters || '-'}</td>
 
-                                            <td className="px-4 py-3 bg-indigo-50/20 dark:bg-indigo-900/10">
-                                                {renderDiffCell(row.AdSetOptimizationGoal, 'AdSetOptimizationGoal', res)}
-                                            </td>
-                                            <td className="px-4 py-3 bg-indigo-50/20 dark:bg-indigo-900/10">
-                                                {renderDiffCell(row.AdSetBillingEvent, 'AdSetBillingEvent', res)}
-                                            </td>
-                                            <td className="px-4 py-3 bg-indigo-50/20 dark:bg-indigo-900/10">
-                                                {renderDiffCell(row.PixelID, 'PixelID', res)}
-                                            </td>
-                                            <td className="px-4 py-3 bg-indigo-50/20 dark:bg-indigo-900/10">
-                                                {renderDiffCell(row.CustomEventType, 'CustomEventType', res)}
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
+                                            <td className="px-4 py-3 bg-indigo-50/20 dark:bg-indigo-900/10">{row.AdSetOptimizationGoal || '-'}</td>
+                                            <td className="px-4 py-3 bg-indigo-50/20 dark:bg-indigo-900/10">{row.AdSetBillingEvent || '-'}</td>
+                                            <td className="px-4 py-3 bg-indigo-50/20 dark:bg-indigo-900/10">{row.PixelID || '-'}</td>
+                                            <td className="px-4 py-3 bg-indigo-50/20 dark:bg-indigo-900/10">{row.CustomEventType || '-'}</td>
+                                         </tr>
+                                     ))}
+                                </tbody>
+                            </table>
+                        )}
                     </div>
                 </div>
             )}
