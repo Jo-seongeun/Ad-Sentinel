@@ -707,28 +707,101 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                             status = 'FAIL';
                         }
 
-                        // Ver2 Copy Fields (Headline, BodyCopy, CTA with normalized linebreaks)
+                        // Ver2 Copy Fields (Headline, BodyCopy, CTA with normalized linebreaks & multi-spec fallbacks)
                         const cleanText = (t: string) => String(t || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
 
-                        const liveHeadline = spec.link_data?.name || spec.video_data?.title || '';
-                        const liveBodyCopy = spec.link_data?.message || spec.video_data?.message || '';
-                        const liveCTA = spec.link_data?.call_to_action?.type || spec.video_data?.call_to_action?.type || '';
+                        const liveHeadline = 
+                            spec.link_data?.name || 
+                            spec.video_data?.title || 
+                            creative.asset_feed_spec?.titles?.[0]?.text || 
+                            '';
 
-                        const normLiveHead = cleanText(liveHeadline);
-                        const normExcelHead = cleanText(row.Headline);
-                        const headMatched = row.Headline ? (normLiveHead ? normLiveHead === normExcelHead : false) : true;
-                        const isNoExcelHead = !row.Headline && Boolean(liveHeadline);
-                        fieldDiffs['Headline'] = { excelVal: row.Headline || '-', apiVal: liveHeadline || '-', matched: headMatched, isNoExcelInput: isNoExcelHead, message: (row.Headline && !headMatched) ? '헤드라인 문구 상이' : undefined };
+                        const liveBodyCopy = 
+                            spec.link_data?.message || 
+                            spec.video_data?.message || 
+                            creative.asset_feed_spec?.bodies?.[0]?.text || 
+                            '';
 
-                        const normLiveBody = cleanText(liveBodyCopy);
-                        const normExcelBody = cleanText(row.BodyCopy);
-                        const bodyMatched = row.BodyCopy ? (normLiveBody ? normLiveBody === normExcelBody : false) : true;
-                        const isNoExcelBody = !row.BodyCopy && Boolean(liveBodyCopy);
-                        fieldDiffs['BodyCopy'] = { excelVal: row.BodyCopy || '-', apiVal: liveBodyCopy || '-', matched: bodyMatched, isNoExcelInput: isNoExcelBody, message: (row.BodyCopy && !bodyMatched) ? '본문 카피 문구 상이' : undefined };
+                        const liveCTA = 
+                            spec.link_data?.call_to_action?.type || 
+                            spec.video_data?.call_to_action?.type || 
+                            creative.asset_feed_spec?.call_to_action_types?.[0] || 
+                            '';
 
-                        const ctaMatched = row.CTA ? (liveCTA ? liveCTA.trim() === row.CTA.trim() : false) : true;
-                        const isNoExcelCTA = !row.CTA && Boolean(liveCTA);
-                        fieldDiffs['CTA'] = { excelVal: row.CTA || '-', apiVal: liveCTA || '-', matched: ctaMatched, isNoExcelInput: isNoExcelCTA, message: (row.CTA && !ctaMatched) ? 'CTA 버튼 상이' : undefined };
+                        // 헬퍼: 엑셀 기획안과 매체 실데이터 1:1 대조 판정 로직
+                        const evaluateCopy = (excelVal: string, liveVal: string, fieldLabel: string) => {
+                            const normExcel = cleanText(excelVal);
+                            const normLive = cleanText(liveVal);
+
+                            if (normExcel) {
+                                if (!normLive) {
+                                    // 🚨 기획안 작성 O, 매체 API 데이터 X ➔ ❌ 불일치!
+                                    return {
+                                        excelVal: excelVal,
+                                        apiVal: '-',
+                                        matched: false,
+                                        isNoExcelInput: false,
+                                        message: `매체에 ${fieldLabel} 미세팅`
+                                    };
+                                } else if (normExcel === normLive) {
+                                    // 양쪽 내용 완전 일치 ➔ ✓ 일치
+                                    return {
+                                        excelVal: excelVal,
+                                        apiVal: liveVal,
+                                        matched: true,
+                                        isNoExcelInput: false
+                                    };
+                                } else {
+                                    // 양쪽 데이터가 존재하나 문구 다름 ➔ ❌ 불일치
+                                    return {
+                                        excelVal: excelVal,
+                                        apiVal: liveVal,
+                                        matched: false,
+                                        isNoExcelInput: false,
+                                        message: `${fieldLabel} 문구 상이`
+                                    };
+                                }
+                            } else {
+                                if (normLive) {
+                                    // 엑셀은 비었으나 매체에 데이터 존재 ➔ ➖ 업로드 내용 없음
+                                    return {
+                                        excelVal: '-',
+                                        apiVal: liveVal,
+                                        matched: true,
+                                        isNoExcelInput: true
+                                    };
+                                } else {
+                                    // 둘 다 비어 있음 ➔ 정상 미세팅
+                                    return {
+                                        excelVal: '-',
+                                        apiVal: '-',
+                                        matched: true,
+                                        isNoExcelInput: false
+                                    };
+                                }
+                            }
+                        };
+
+                        const headDiff = evaluateCopy(row.Headline, liveHeadline, '헤드라인');
+                        fieldDiffs['Headline'] = headDiff;
+                        if (row.Headline && !headDiff.matched) {
+                            errors.push(headDiff.message || '헤드라인 불일치');
+                            status = 'FAIL';
+                        }
+
+                        const bodyDiff = evaluateCopy(row.BodyCopy, liveBodyCopy, '본문 카피');
+                        fieldDiffs['BodyCopy'] = bodyDiff;
+                        if (row.BodyCopy && !bodyDiff.matched) {
+                            errors.push(bodyDiff.message || '본문 카피 불일치');
+                            status = 'FAIL';
+                        }
+
+                        const ctaDiff = evaluateCopy(row.CTA, liveCTA, 'CTA 버튼');
+                        fieldDiffs['CTA'] = ctaDiff;
+                        if (row.CTA && !ctaDiff.matched) {
+                            errors.push(ctaDiff.message || 'CTA 버튼 불일치');
+                            status = 'FAIL';
+                        }
                     }
                 }
             }
@@ -924,16 +997,44 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
             fieldDiffs['AdSetName'] = { excelVal: row.AdSetName || '-', apiVal: row.AdSetName || '-', matched: true };
             fieldDiffs['AdName'] = { excelVal: row.AdName || '-', apiVal: row.AdName || '-', matched: true };
 
-            const isHeadlineMatched = i % 2 === 0;
-            fieldDiffs['Headline'] = {
-                excelVal: row.Headline || '-',
-                apiVal: row.Headline ? (isHeadlineMatched ? row.Headline : `${row.Headline} (등록값 상이)`) : '-',
-                matched: !row.Headline || isHeadlineMatched,
-                message: (!row.Headline || isHeadlineMatched) ? undefined : '헤드라인 문구 상이'
+            const mockEvaluateCopy = (excelVal: string, liveVal: string, fieldLabel: string) => {
+                const cleanExcel = (excelVal || '').trim();
+                const cleanLive = (liveVal || '').trim();
+
+                if (cleanExcel) {
+                    if (!cleanLive || cleanLive === '-') {
+                        return { excelVal: cleanExcel, apiVal: '-', matched: false, isNoExcelInput: false, message: `매체에 ${fieldLabel} 미세팅` };
+                    } else if (cleanExcel === cleanLive) {
+                        return { excelVal: cleanExcel, apiVal: cleanLive, matched: true, isNoExcelInput: false };
+                    } else {
+                        return { excelVal: cleanExcel, apiVal: cleanLive, matched: false, isNoExcelInput: false, message: `${fieldLabel} 문구 상이` };
+                    }
+                } else {
+                    if (cleanLive && cleanLive !== '-') {
+                        return { excelVal: '-', apiVal: cleanLive, matched: true, isNoExcelInput: true };
+                    } else {
+                        return { excelVal: '-', apiVal: '-', matched: true, isNoExcelInput: false };
+                    }
+                }
             };
 
-            fieldDiffs['BodyCopy'] = { excelVal: row.BodyCopy || '-', apiVal: row.BodyCopy || '-', matched: true };
-            fieldDiffs['CTA'] = { excelVal: row.CTA || '-', apiVal: row.CTA || '-', matched: true };
+            const isHeadlineMatched = i % 2 === 0;
+            const mockHeadlineApi = row.Headline ? (isHeadlineMatched ? row.Headline : '-') : '-';
+            const headDiff = mockEvaluateCopy(row.Headline, mockHeadlineApi, '헤드라인');
+            fieldDiffs['Headline'] = headDiff;
+            if (row.Headline && !headDiff.matched) errors.push(headDiff.message || '헤드라인 불일치');
+
+            const isBodyMatched = i % 3 !== 1;
+            const mockBodyApi = row.BodyCopy ? (isBodyMatched ? row.BodyCopy : '-') : '-';
+            const bodyDiff = mockEvaluateCopy(row.BodyCopy, mockBodyApi, '본문 카피');
+            fieldDiffs['BodyCopy'] = bodyDiff;
+            if (row.BodyCopy && !bodyDiff.matched) errors.push(bodyDiff.message || '본문 카피 불일치');
+
+            const mockCtaApi = row.CTA || '-';
+            const ctaDiff = mockEvaluateCopy(row.CTA, mockCtaApi, 'CTA 버튼');
+            fieldDiffs['CTA'] = ctaDiff;
+            if (row.CTA && !ctaDiff.matched) errors.push(ctaDiff.message || 'CTA 버튼 불일치');
+
             fieldDiffs['LandingURL'] = { excelVal: row.LandingURL || '-', apiVal: row.LandingURL || '-', matched: true };
 
             if (!row.UTMParameters) {
