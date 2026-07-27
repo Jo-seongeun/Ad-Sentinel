@@ -557,6 +557,13 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                         const spec = creative.object_story_spec || {};
                         const metaLink = spec.link_data?.link || spec.video_data?.call_to_action?.value?.link || "";
 
+                        const extractPureUrls = (raw: string): string[] => {
+                            if (!raw) return [];
+                            const matches = raw.match(/https?:\/\/[^\s\r\n\]]+/g);
+                            if (!matches || matches.length === 0) return [raw.trim()];
+                            return matches;
+                        };
+
                         const normalizeUrl = (url: string) => {
                             if (!url) return "";
                             try {
@@ -568,9 +575,11 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                         };
 
                         const normMeta = normalizeUrl(metaLink);
-                        const normExcel = normalizeUrl(row.LandingURL || '');
-                        const landingMatched = Boolean(!row.LandingURL || (normMeta && normExcel && normMeta === normExcel));
+                        const excelUrls = extractPureUrls(row.LandingURL || '');
+                        const normExcelUrls = excelUrls.map(u => normalizeUrl(u));
+                        const landingMatched = Boolean(!row.LandingURL || (normMeta && normExcelUrls.some(u => u === normMeta)));
                         const isNoExcelLanding = !row.LandingURL && Boolean(metaLink);
+
                         fieldDiffs['LandingURL'] = {
                             excelVal: row.LandingURL || '-',
                             apiVal: metaLink || '미설정',
@@ -588,10 +597,20 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                             }
                         }
 
-                        // UTM Parameter Check
+                        // UTM Parameter Check (Clean bracket tags like [기본 설정])
+                        const cleanUtmString = (raw: string) => {
+                            if (!raw) return "";
+                            return raw.replace(/\[[^\]]+\]/g, '').replace(/[\r\n]+/g, ' ').trim();
+                        };
+
                         const metaUtm = creative.url_tags || "";
-                        const utmMatched = Boolean(!row.UTMParameters || (metaUtm && (metaUtm.includes(row.UTMParameters) || metaUtm === row.UTMParameters)));
+                        const cleanedExcelUtm = cleanUtmString(row.UTMParameters || '');
+                        const utmMatched = Boolean(
+                            !row.UTMParameters ||
+                            (metaUtm && (metaUtm.includes(cleanedExcelUtm) || cleanedExcelUtm.includes(metaUtm) || metaUtm === cleanedExcelUtm))
+                        );
                         const isNoExcelUtm = !row.UTMParameters && Boolean(metaUtm);
+
                         fieldDiffs['UTMParameters'] = {
                             excelVal: row.UTMParameters || '-',
                             apiVal: metaUtm || '미세팅',
@@ -604,16 +623,22 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                             status = 'FAIL';
                         }
 
-                        // Ver2 Copy Fields (Headline, BodyCopy, CTA)
+                        // Ver2 Copy Fields (Headline, BodyCopy, CTA with normalized linebreaks)
+                        const cleanText = (t: string) => String(t || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+
                         const liveHeadline = spec.link_data?.name || spec.video_data?.title || '';
                         const liveBodyCopy = spec.link_data?.message || spec.video_data?.message || '';
                         const liveCTA = spec.link_data?.call_to_action?.type || spec.video_data?.call_to_action?.type || '';
 
-                        const headMatched = row.Headline ? (liveHeadline ? liveHeadline.trim() === row.Headline.trim() : false) : true;
+                        const normLiveHead = cleanText(liveHeadline);
+                        const normExcelHead = cleanText(row.Headline);
+                        const headMatched = row.Headline ? (normLiveHead ? normLiveHead === normExcelHead : false) : true;
                         const isNoExcelHead = !row.Headline && Boolean(liveHeadline);
                         fieldDiffs['Headline'] = { excelVal: row.Headline || '-', apiVal: liveHeadline || '-', matched: headMatched, isNoExcelInput: isNoExcelHead, message: (row.Headline && !headMatched) ? '헤드라인 문구 상이' : undefined };
 
-                        const bodyMatched = row.BodyCopy ? (liveBodyCopy ? liveBodyCopy.trim() === row.BodyCopy.trim() : false) : true;
+                        const normLiveBody = cleanText(liveBodyCopy);
+                        const normExcelBody = cleanText(row.BodyCopy);
+                        const bodyMatched = row.BodyCopy ? (normLiveBody ? normLiveBody === normExcelBody : false) : true;
                         const isNoExcelBody = !row.BodyCopy && Boolean(liveBodyCopy);
                         fieldDiffs['BodyCopy'] = { excelVal: row.BodyCopy || '-', apiVal: liveBodyCopy || '-', matched: bodyMatched, isNoExcelInput: isNoExcelBody, message: (row.BodyCopy && !bodyMatched) ? '본문 카피 문구 상이' : undefined };
 
