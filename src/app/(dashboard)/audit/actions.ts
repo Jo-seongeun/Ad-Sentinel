@@ -317,14 +317,41 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                 const safeCampName = String(row.CampaignName || '').replace(/\s+/g, '').toLowerCase();
                 const safeCampId = String(row.CampaignID || '').replace(/\s+/g, '');
 
-                const liveAdSet = cache.adsets.find((a: any) => {
-                    const adSetNameMatch = String(a.name || '').replace(/\s+/g, '').toLowerCase() === safeName;
-                    if (safeCampId) {
-                        return adSetNameMatch && a.campaign_id === safeCampId;
-                    } else {
-                        return adSetNameMatch && String(a.campaign?.name || '').replace(/\s+/g, '').toLowerCase() === safeCampName;
+                let liveAdSet: any = null;
+
+                if (safeCampId) {
+                    // 1. 엑셀에 캠페인 ID가 기재되어 있는 경우: 최우선 1:1 정밀 대조
+                    liveAdSet = cache.adsets.find((a: any) => {
+                        const adSetNameMatch = String(a.name || '').replace(/\s+/g, '').toLowerCase() === safeName;
+                        return adSetNameMatch && String(a.campaign_id || '') === safeCampId;
+                    });
+                } else {
+                    // 2. 캠페인 ID가 비어있고 캠페인명만 있는 경우: 스마트 하이브리드 검색
+                    const candidateAdSets = cache.adsets.filter((a: any) => {
+                        const adSetNameMatch = String(a.name || '').replace(/\s+/g, '').toLowerCase() === safeName;
+                        const campNameMatch = String(a.campaign?.name || '').replace(/\s+/g, '').toLowerCase() === safeCampName;
+                        return adSetNameMatch && campNameMatch;
+                    });
+
+                    const uniqueCampIds = Array.from(new Set(candidateAdSets.map((a: any) => a.campaign_id).filter(Boolean)));
+
+                    if (candidateAdSets.length > 0) {
+                        // 1순위: 활성화(ACTIVE) 상태의 캠페인/광고세트 선택
+                        const activeCandidate = candidateAdSets.find((a: any) => {
+                            const isCampActive = (a.campaign?.status || '').toUpperCase() === 'ACTIVE';
+                            const isAdSetModifiable = (a.status || '').toUpperCase() === 'ACTIVE';
+                            return isCampActive || isAdSetModifiable;
+                        });
+
+                        liveAdSet = activeCandidate || candidateAdSets[0];
+
+                        // 2개 이상의 동명 캠페인이 발굴된 경우 마케터 안내용 스마트 경고(WARNING) 표출
+                        if (uniqueCampIds.length > 1) {
+                            errors.push(`⚠️ 라이브 계정에 동일 캠페인명(${row.CampaignName})이 ${uniqueCampIds.length}개 존재하여 활성화(ACTIVE) 캠페인을 우선 매칭했습니다. (정밀 대조를 위해 엑셀에 캠페인 ID 기입 권장)`);
+                            if (status === 'PASS') status = 'WARNING';
+                        }
                     }
-                });
+                }
 
                 if (!liveAdSet) {
                     errors.push('매체에 일치하는 광고 세트가 없음');
@@ -725,9 +752,21 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                     } catch { return url.split('?')[0].replace(/\/$/, '').toLowerCase(); }
                 };
 
-                const liveCampaign = row.CampaignID
-                    ? cache.campaigns.find((c: any) => String(c.id) === String(row.CampaignID).trim())
-                    : cache.campaigns.find((c: any) => normalizeStr(c.name) === normalizeStr(row.CampaignName));
+                let liveCampaign: any = null;
+                if (row.CampaignID) {
+                    liveCampaign = cache.campaigns.find((c: any) => String(c.id) === String(row.CampaignID).trim());
+                } else {
+                    const candidateCampaigns = cache.campaigns.filter((c: any) => normalizeStr(c.name) === normalizeStr(row.CampaignName));
+                    if (candidateCampaigns.length > 0) {
+                        const activeCandidate = candidateCampaigns.find((c: any) => (c.status || '').toUpperCase() === 'ENABLED');
+                        liveCampaign = activeCandidate || candidateCampaigns[0];
+
+                        if (candidateCampaigns.length > 1) {
+                            errors.push(`⚠️ 라이브 계정에 동일 캠페인명(${row.CampaignName})이 ${candidateCampaigns.length}개 존재하여 활성화(ENABLED) 캠페인을 우선 매칭했습니다. (정밀 대조를 위해 엑셀에 캠페인 ID 기입 권장)`);
+                            if (status === 'PASS') status = 'WARNING';
+                        }
+                    }
+                }
 
                 if (!liveCampaign) {
                     errors.push(`매체에 일치하는 캠페인이 없음 (${row.CampaignID || row.CampaignName})`);
