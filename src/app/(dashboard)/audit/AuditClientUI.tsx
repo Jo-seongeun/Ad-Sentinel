@@ -469,6 +469,52 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
         );
     };
 
+    const renderDrawerDiffCard = (
+        label: string,
+        fieldKey: string,
+        res: AuditResult | undefined,
+        row: ParsedRow,
+        isNumberFormatter?: boolean
+    ) => {
+        const diff = res?.fieldDiffs?.[fieldKey];
+        const rawExcel = (row as unknown as Record<string, unknown>)[fieldKey];
+        const excelText = diff?.excelVal || (isNumberFormatter && typeof rawExcel === 'number' && rawExcel > 0 ? rawExcel.toLocaleString() : String(rawExcel || '-'));
+        const apiText = diff?.apiVal || '-';
+
+        let badge = <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">✓ 일치</span>;
+        let cardBg = 'bg-zinc-50 dark:bg-zinc-800/60 border-zinc-200 dark:border-zinc-700/80';
+
+        if (diff && !diff.matched) {
+            badge = <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300">❌ 불일치</span>;
+            cardBg = 'bg-rose-50/70 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800';
+        } else if (diff?.isNoExcelInput) {
+            badge = <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300">➖ 업로드 내용 없음</span>;
+            cardBg = 'bg-amber-50/70 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800';
+        }
+
+        return (
+            <div className={`p-3 rounded-xl border ${cardBg} transition-all space-y-2`}>
+                <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300">{label}</span>
+                    {badge}
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs pt-1 border-t border-zinc-200/60 dark:border-zinc-700/60">
+                    <div>
+                        <span className="text-[10px] text-zinc-400 block font-semibold">계획 (Excel 기획안)</span>
+                        <span className="font-mono text-zinc-800 dark:text-zinc-200 text-[11px] whitespace-pre-wrap break-all">{excelText}</span>
+                    </div>
+                    <div>
+                        <span className="text-[10px] text-zinc-400 block font-semibold">실제 (Live API 데이터)</span>
+                        <span className="font-mono text-indigo-600 dark:text-indigo-400 text-[11px] font-semibold whitespace-pre-wrap break-all">{apiText}</span>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    const activeRow = activeDrawerRowIndex !== null ? rows[activeDrawerRowIndex] : null;
+    const activeRes = activeDrawerRowIndex !== null ? results?.find(r => r.rowId === activeDrawerRowIndex) : undefined;
+
     return (
         <div className="flex-1 overflow-hidden flex flex-col gap-4">
             {rows.length === 0 ? (
@@ -879,6 +925,124 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
                                 </tbody>
                             </table>
                         )}
+                    </div>
+                </div>
+            )}
+
+            {/* ──────────────────────────────────────────────────────── */}
+            {/* SLIDE-OVER DRAWER (우측 상세 서랍 팝업 - ver1 vs ver2 차별화 모달) */}
+            {/* ──────────────────────────────────────────────────────── */}
+            {activeRow && (
+                <div 
+                    className="fixed inset-0 z-[9999] overflow-hidden bg-black/60 backdrop-blur-xs flex justify-end animate-in fade-in duration-200"
+                    onClick={() => setActiveDrawerRowIndex(null)}
+                >
+                    <div 
+                        className="w-full max-w-2xl bg-white dark:bg-zinc-900 h-full shadow-2xl flex flex-col border-l border-zinc-200 dark:border-zinc-800 animate-in slide-in-from-right duration-300"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Drawer Header */}
+                        <div className="p-5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/90 dark:bg-zinc-900/90">
+                            <div>
+                                <span className={`text-[11px] font-extrabold px-2.5 py-1 rounded-full ${
+                                    viewMode === 'ver1' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300' : 'bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300'
+                                }`}>
+                                    {viewMode === 'ver1' ? '📌 ver1 캠페인 세팅 내역서 정밀 리포트' : '🎨 ver2 소재 참조 세부 내역서 정밀 리포트'}
+                                </span>
+                                <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-50 mt-2 flex items-center gap-2">
+                                    {activeRow.AdName || activeRow.AdSetName}
+                                </h3>
+                                <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate max-w-lg mt-0.5 font-mono">
+                                    캠페인: {activeRow.CampaignName} (계정 ID: {activeRow.AccountID})
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setActiveDrawerRowIndex(null)}
+                                className="p-2 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 rounded-xl hover:bg-zinc-200/50 dark:hover:bg-zinc-800 transition-colors"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Drawer Body - ver1 vs ver2 탭 모드별 핵심 정보 우선 배치 */}
+                        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+
+                            {/* ── MODE 1: ver1 선택 시 (캠페인 및 예산/일정 중심 리포트) ── */}
+                            {viewMode === 'ver1' ? (
+                                <>
+                                    <div className="space-y-3">
+                                        <h4 className="text-xs font-extrabold text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5 border-b border-indigo-100 dark:border-indigo-900/50 pb-2">
+                                            <span className="w-5 h-5 bg-indigo-600 text-white rounded-full text-[11px] flex items-center justify-center font-bold">1</span>
+                                            [ver1 핵심] 캠페인 예산 / 일정 / 목적 설정 대조
+                                        </h4>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            {renderDrawerDiffCard('통화 (Currency)', 'Currency', activeRes, activeRow)}
+                                            {renderDrawerDiffCard('시작일 (StartDate)', 'StartDate', activeRes, activeRow)}
+                                            {renderDrawerDiffCard('종료일 (EndDate)', 'EndDate', activeRes, activeRow)}
+                                            {renderDrawerDiffCard('캠페인 목적 (Objective)', 'CampaignObjective', activeRes, activeRow)}
+                                            {renderDrawerDiffCard('구매 유형 (BuyingType)', 'CampaignBuyingType', activeRes, activeRow)}
+                                            {renderDrawerDiffCard('캠페인 일 예산', 'CampaignDailyBudget', activeRes, activeRow, true)}
+                                            {renderDrawerDiffCard('캠페인 총 예산', 'CampaignLifetimeBudget', activeRes, activeRow, true)}
+                                            {renderDrawerDiffCard('세트 일 예산', 'AdSetDailyBudget', activeRes, activeRow, true)}
+                                            {renderDrawerDiffCard('세트 총 예산', 'AdSetLifetimeBudget', activeRes, activeRow, true)}
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-3 pt-2">
+                                        <h4 className="text-xs font-bold text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5 border-b border-zinc-100 dark:border-zinc-800 pb-2">
+                                            <span className="w-5 h-5 bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-full text-[11px] flex items-center justify-center font-bold">2</span>
+                                            연동 타겟 및 소재 정보 보조 확인
+                                        </h4>
+                                        <div className="space-y-2">
+                                            {renderDrawerDiffCard('랜딩 URL', 'LandingURL', activeRes, activeRow)}
+                                            {renderDrawerDiffCard('UTM 파라미터', 'UTMParameters', activeRes, activeRow)}
+                                        </div>
+                                    </div>
+                                </>
+                            ) : (
+                                /* ── MODE 2: ver2 선택 시 (광고 소재 문구 및 Multi-Placement URL/UTM 중심 리포트) ── */
+                                <>
+                                    <div className="space-y-3">
+                                        <h4 className="text-xs font-extrabold text-violet-600 dark:text-violet-400 flex items-center gap-1.5 border-b border-violet-100 dark:border-violet-900/50 pb-2">
+                                            <span className="w-5 h-5 bg-violet-600 text-white rounded-full text-[11px] flex items-center justify-center font-bold">1</span>
+                                            [ver2 핵심] 광고 소재 문구 & 카피라이팅 1:1 대조
+                                        </h4>
+                                        <div className="space-y-3">
+                                            {renderDrawerDiffCard('헤드라인 문구 (Headline)', 'Headline', activeRes, activeRow)}
+                                            {renderDrawerDiffCard('기본 본문 카피 (BodyCopy)', 'BodyCopy', activeRes, activeRow)}
+                                            {renderDrawerDiffCard('행동유도 (CTA 버튼)', 'CTA', activeRes, activeRow)}
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-3 pt-2">
+                                        <h4 className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 border-b border-emerald-100 dark:border-emerald-900/50 pb-2">
+                                            <span className="w-5 h-5 bg-emerald-600 text-white rounded-full text-[11px] flex items-center justify-center font-bold">2</span>
+                                            [ver2 핵심] 노출 지면별 맞춤 URL (`[지면명]`) & UTM / 픽셀 검수
+                                        </h4>
+                                        <div className="space-y-3">
+                                            {renderDrawerDiffCard('Multi-Placement 랜딩 URL', 'LandingURL', activeRes, activeRow)}
+                                            {renderDrawerDiffCard('UTM 파라미터', 'UTMParameters', activeRes, activeRow)}
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-3 mt-3">
+                                            {renderDrawerDiffCard('최적화 목표', 'AdSetOptimizationGoal', activeRes, activeRow)}
+                                            {renderDrawerDiffCard('과금 기준', 'AdSetBillingEvent', activeRes, activeRow)}
+                                            {renderDrawerDiffCard('픽셀 ID', 'PixelID', activeRes, activeRow)}
+                                            {renderDrawerDiffCard('이벤트 유형', 'CustomEventType', activeRes, activeRow)}
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+
+                        {/* Drawer Footer */}
+                        <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900">
+                            <button
+                                onClick={() => setActiveDrawerRowIndex(null)}
+                                className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm active:scale-[0.99] cursor-pointer"
+                            >
+                                검수 리포트 확인 완료
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
