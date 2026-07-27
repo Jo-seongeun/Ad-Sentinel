@@ -967,6 +967,21 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
                         {/* Drawer Body - ver1 vs ver2 탭 모드별 핵심 정보 우선 배치 */}
                         <div className="flex-1 overflow-y-auto p-6 space-y-6">
 
+                            {/* 검수 알림 & 경고 배너 박스 (동명 캠페인 경고 메시지 포함) */}
+                            {activeRes?.errors && activeRes.errors.length > 0 && (
+                                <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 space-y-2 shadow-xs">
+                                    <h4 className="text-xs font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                                        <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                                        검수 알림 & 스마트 경고 리포트 ({activeRes.errors.length}건)
+                                    </h4>
+                                    <ul className="space-y-1.5 pl-5 list-disc text-xs text-amber-900 dark:text-amber-200 font-medium">
+                                        {activeRes.errors.map((err, idx) => (
+                                            <li key={idx} className="leading-relaxed">{err}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+
                             {/* ── MODE 1: ver1 선택 시 (캠페인 및 예산/일정 중심 리포트) ── */}
                             {viewMode === 'ver1' ? (
                                 <>

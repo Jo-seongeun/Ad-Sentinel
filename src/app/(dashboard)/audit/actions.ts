@@ -943,6 +943,17 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
             } else {
                 fieldDiffs['UTMParameters'] = { excelVal: row.UTMParameters, apiVal: row.UTMParameters, matched: true };
             }
+
+            // 엑셀 내 동명 캠페인 및 ID 미입력 스마트 경고 체크
+            const sameCampRows = processedRows.filter(r => 
+                r.AccountID === row.AccountID && 
+                String(r.CampaignName || '').replace(/\s+/g, '').toLowerCase() === String(row.CampaignName || '').replace(/\s+/g, '').toLowerCase()
+            );
+
+            if (!row.CampaignID && sameCampRows.length > 1) {
+                errors.push(`⚠️ 라이브 계정에 동일 캠페인명(${row.CampaignName})이 ${sameCampRows.length}개 존재하여 활성화(ACTIVE) 캠페인을 우선 매칭했습니다. (정밀 대조를 위해 엑셀에 캠페인 ID 기입 권장)`);
+                if (status === 'PASS') status = 'WARNING';
+            }
         }
 
         results.push({
