@@ -384,57 +384,91 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
 
                     const liveCampDaily = Number(liveAdSet.campaign?.daily_budget) || 0;
                     const liveCampLifetime = Number(liveAdSet.campaign?.lifetime_budget) || 0;
-                    const liveCampNormalized = liveCampDaily || liveCampLifetime || 0;
 
                     const liveAdSetDaily = Number(liveAdSet.daily_budget) || 0;
                     const liveAdSetLifetime = Number(liveAdSet.lifetime_budget) || 0;
-                    const liveAdSetNormalized = liveAdSetDaily || liveAdSetLifetime || 0;
 
-                    const campDailyMatched = excelCampDaily > 0 ? (liveCampDaily > 0 && Math.abs(liveCampDaily - excelCampDaily) <= (excelCampDaily * 0.1)) : true;
+                    // 캠페인 일 예산 대조 및 표출
+                    let campDailyMatched = true;
+                    let isNoExcelCampDaily = false;
+                    if (excelCampDaily > 0) {
+                        campDailyMatched = liveCampDaily > 0 && Math.abs(liveCampDaily - excelCampDaily) <= (excelCampDaily * 0.1);
+                    } else if (liveCampDaily > 0) {
+                        isNoExcelCampDaily = true;
+                    }
+
                     fieldDiffs['CampaignDailyBudget'] = {
                         excelVal: excelCampDaily > 0 ? excelCampDaily.toLocaleString() : '-',
-                        apiVal: liveCampDaily > 0 ? liveCampDaily.toLocaleString() : (liveCampNormalized > 0 ? liveCampNormalized.toLocaleString() : '-'),
+                        apiVal: liveCampDaily > 0 ? liveCampDaily.toLocaleString() : '-',
                         matched: campDailyMatched,
+                        isNoExcelInput: isNoExcelCampDaily,
                         message: campDailyMatched ? undefined : '캠페인 일 예산 불일치'
                     };
                     if (excelCampDaily > 0 && !campDailyMatched) {
-                        errors.push(`캠페인 일 예산 불일치 (기획안: ${excelCampDaily.toLocaleString()}, 매체: ${liveCampDaily.toLocaleString()})`);
+                        errors.push(`캠페인 일 예산 불일치 (기획안: ${excelCampDaily.toLocaleString()}, 매체: ${liveCampDaily > 0 ? liveCampDaily.toLocaleString() : '미세팅'})`);
                         status = 'FAIL';
                     }
 
-                    const campLifeMatched = excelCampLifetime > 0 ? (liveCampLifetime > 0 && Math.abs(liveCampLifetime - excelCampLifetime) <= (excelCampLifetime * 0.1)) : true;
+                    // 캠페인 총 예산 대조 및 표출
+                    let campLifeMatched = true;
+                    let isNoExcelCampLife = false;
+                    if (excelCampLifetime > 0) {
+                        campLifeMatched = liveCampLifetime > 0 && Math.abs(liveCampLifetime - excelCampLifetime) <= (excelCampLifetime * 0.1);
+                    } else if (liveCampLifetime > 0) {
+                        isNoExcelCampLife = true;
+                    }
+
                     fieldDiffs['CampaignLifetimeBudget'] = {
                         excelVal: excelCampLifetime > 0 ? excelCampLifetime.toLocaleString() : '-',
-                        apiVal: liveCampLifetime > 0 ? liveCampLifetime.toLocaleString() : (liveCampNormalized > 0 ? liveCampNormalized.toLocaleString() : '-'),
+                        apiVal: liveCampLifetime > 0 ? liveCampLifetime.toLocaleString() : '-',
                         matched: campLifeMatched,
-                        message: campLifeMatched ? undefined : '캠페인 예산 불일치'
+                        isNoExcelInput: isNoExcelCampLife,
+                        message: campLifeMatched ? undefined : '캠페인 총 예산 불일치'
                     };
                     if (excelCampLifetime > 0 && !campLifeMatched) {
-                        errors.push(`캠페인 예산 불일치 (기획안: ${excelCampLifetime.toLocaleString()}, 매체: ${liveCampLifetime.toLocaleString()})`);
+                        errors.push(`캠페인 총 예산 불일치 (기획안: ${excelCampLifetime.toLocaleString()}, 매체: ${liveCampLifetime > 0 ? liveCampLifetime.toLocaleString() : '미세팅'})`);
                         status = 'FAIL';
                     }
 
-                    const adsetDailyMatched = excelAdSetDaily > 0 ? (liveAdSetDaily > 0 && Math.abs(liveAdSetDaily - excelAdSetDaily) <= (excelAdSetDaily * 0.1)) : true;
+                    // 광고세트 일 예산 대조 및 표출
+                    let adsetDailyMatched = true;
+                    let isNoExcelAdsetDaily = false;
+                    if (excelAdSetDaily > 0) {
+                        adsetDailyMatched = liveAdSetDaily > 0 && Math.abs(liveAdSetDaily - excelAdSetDaily) <= (excelAdSetDaily * 0.1);
+                    } else if (liveAdSetDaily > 0) {
+                        isNoExcelAdsetDaily = true;
+                    }
+
                     fieldDiffs['AdSetDailyBudget'] = {
                         excelVal: excelAdSetDaily > 0 ? excelAdSetDaily.toLocaleString() : '-',
-                        apiVal: liveAdSetDaily > 0 ? liveAdSetDaily.toLocaleString() : (liveAdSetNormalized > 0 ? liveAdSetNormalized.toLocaleString() : '-'),
+                        apiVal: liveAdSetDaily > 0 ? liveAdSetDaily.toLocaleString() : '-',
                         matched: adsetDailyMatched,
+                        isNoExcelInput: isNoExcelAdsetDaily,
                         message: adsetDailyMatched ? undefined : '세트 일 예산 불일치'
                     };
                     if (excelAdSetDaily > 0 && !adsetDailyMatched) {
-                        errors.push(`세트 일 예산 불일치 (기획안: ${excelAdSetDaily.toLocaleString()}, 매체: ${liveAdSetDaily.toLocaleString()})`);
+                        errors.push(`세트 일 예산 불일치 (기획안: ${excelAdSetDaily.toLocaleString()}, 매체: ${liveAdSetDaily > 0 ? liveAdSetDaily.toLocaleString() : '미세팅'})`);
                         status = 'FAIL';
                     }
 
-                    const adsetLifeMatched = excelAdSetLifetime > 0 ? (liveAdSetLifetime > 0 && Math.abs(liveAdSetLifetime - excelAdSetLifetime) <= (excelAdSetLifetime * 0.1)) : true;
+                    // 광고세트 총 예산 대조 및 표출
+                    let adsetLifeMatched = true;
+                    let isNoExcelAdsetLife = false;
+                    if (excelAdSetLifetime > 0) {
+                        adsetLifeMatched = liveAdSetLifetime > 0 && Math.abs(liveAdSetLifetime - excelAdSetLifetime) <= (excelAdSetLifetime * 0.1);
+                    } else if (liveAdSetLifetime > 0) {
+                        isNoExcelAdsetLife = true;
+                    }
+
                     fieldDiffs['AdSetLifetimeBudget'] = {
                         excelVal: excelAdSetLifetime > 0 ? excelAdSetLifetime.toLocaleString() : '-',
-                        apiVal: liveAdSetLifetime > 0 ? liveAdSetLifetime.toLocaleString() : (liveAdSetNormalized > 0 ? liveAdSetNormalized.toLocaleString() : '-'),
+                        apiVal: liveAdSetLifetime > 0 ? liveAdSetLifetime.toLocaleString() : '-',
                         matched: adsetLifeMatched,
-                        message: adsetLifeMatched ? undefined : '세트 예산 불일치'
+                        isNoExcelInput: isNoExcelAdsetLife,
+                        message: adsetLifeMatched ? undefined : '세트 총 예산 불일치'
                     };
                     if (excelAdSetLifetime > 0 && !adsetLifeMatched) {
-                        errors.push(`세트 예산 불일치 (기획안: ${excelAdSetLifetime.toLocaleString()}, 매체: ${liveAdSetLifetime.toLocaleString()})`);
+                        errors.push(`세트 총 예산 불일치 (기획안: ${excelAdSetLifetime.toLocaleString()}, 매체: ${liveAdSetLifetime > 0 ? liveAdSetLifetime.toLocaleString() : '미세팅'})`);
                         status = 'FAIL';
                     }
 
