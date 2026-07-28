@@ -481,15 +481,31 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
         const excelText = diff?.excelVal || (isNumberFormatter && typeof rawExcel === 'number' && rawExcel > 0 ? rawExcel.toLocaleString() : String(rawExcel || '-'));
         const apiText = diff?.apiVal || '-';
 
+        const hasExcelText = excelText && excelText !== '-' && excelText !== '미입력' && excelText.trim() !== '';
+        const hasApiText = apiText && apiText !== '-' && apiText !== '미확인' && apiText !== '미세팅' && apiText.trim() !== '';
+
         let badge = <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">✓ 일치</span>;
         let cardBg = 'bg-zinc-50 dark:bg-zinc-800/60 border-zinc-200 dark:border-zinc-700/80';
 
-        if (diff && !diff.matched) {
+        // 1. 엑셀 기획안 데이터는 작성되어 있는데 실제 API 데이터가 미세팅/미확인인 경우 ➔ 무조건 ❌ 불일치!
+        if (hasExcelText && !hasApiText) {
+            badge = <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300">❌ 매체 미세팅 (불일치)</span>;
+            cardBg = 'bg-rose-50/70 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800';
+        }
+        // 2. 백엔드 diff에서 matched가 false로 명시되어 있는 경우 ➔ ❌ 불일치!
+        else if (diff && !diff.matched) {
             badge = <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300">❌ 불일치</span>;
             cardBg = 'bg-rose-50/70 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800';
-        } else if (diff?.isNoExcelInput) {
+        } 
+        // 3. 엑셀 기획안은 비어있으나 매체 API에는 데이터가 설정되어 있는 경우 ➔ ➖ 업로드 내용 없음
+        else if (diff?.isNoExcelInput || (!hasExcelText && hasApiText)) {
             badge = <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300">➖ 업로드 내용 없음</span>;
             cardBg = 'bg-amber-50/70 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800';
+        }
+        // 4. 둘 다 비어있는 경우 ➔ 미세팅
+        else if (!hasExcelText && !hasApiText) {
+            badge = <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">미세팅</span>;
+            cardBg = 'bg-zinc-50 dark:bg-zinc-800/60 border-zinc-200 dark:border-zinc-700/80';
         }
 
         return (

@@ -599,7 +599,23 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
 
                     // 7. Ad Level Checks (AdName, LandingURL, UTM, Headline, Body, CTA)
                     const safeAdName = String(row.AdName || '').trim().toLowerCase();
-                    const liveAd = cache.ads.find((a: any) => String(a.name || '').trim().toLowerCase() === safeAdName && a.adset_id === liveAdSet.id);
+                    const normAdName = safeAdName.replace(/\s+/g, '');
+
+                    // 1순위: adset_id & 광고명 완전 일치 탐색
+                    let liveAd = cache.ads.find((a: any) => String(a.name || '').trim().toLowerCase() === safeAdName && a.adset_id === liveAdSet.id);
+
+                    // 2순위: 띄어쓰기 제거 후 공백 무시 일치 탐색
+                    if (!liveAd) {
+                        liveAd = cache.ads.find((a: any) => String(a.name || '').replace(/\s+/g, '').toLowerCase() === normAdName && a.adset_id === liveAdSet.id);
+                    }
+
+                    // 3순위: 해당 광고 세트 내에 등록된 광고가 1개인 경우 자동 선택
+                    if (!liveAd && liveAdSet.id) {
+                        const adsetAds = cache.ads.filter((a: any) => a.adset_id === liveAdSet.id);
+                        if (adsetAds.length === 1) {
+                            liveAd = adsetAds[0];
+                        }
+                    }
                     
                     if (!liveAd) {
                         fieldDiffs['AdName'] = { excelVal: row.AdName || '-', apiVal: '없음', matched: false, message: '광고 소재 미존재' };
