@@ -631,6 +631,8 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                     // 7. Ad Level Checks (AdName, LandingURL, UTM, Headline, Body, CTA)
                     const safeAdName = String(row.AdName || '').trim().toLowerCase();
                     const normAdName = safeAdName.replace(/\s+/g, '');
+                    // 서픽스(-s, -a, -1 등) 제거 기본 소재명
+                    const baseAdName = safeAdName.replace(/-[a-z0-9]+$/i, '').trim();
 
                     // 1순위: adset_id & 광고명 완전 일치 탐색
                     let liveAd = cache.ads.find((a: any) => String(a.name || '').trim().toLowerCase() === safeAdName && a.adset_id === liveAdSet.id);
@@ -640,12 +642,28 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                         liveAd = cache.ads.find((a: any) => String(a.name || '').replace(/\s+/g, '').toLowerCase() === normAdName && a.adset_id === liveAdSet.id);
                     }
 
-                    // 3순위: 해당 광고 세트 내에 등록된 광고가 1개인 경우 자동 선택
+                    // 3순위: 서픽스(-S 등) 제외 접두사/부분 일치 탐색 (예: LAD_VID_OTH_DE_G6-Main-30s-S -> LAD_VID_OTH_DE_G6-Main-30s)
+                    if (!liveAd && baseAdName) {
+                        liveAd = cache.ads.find((a: any) => {
+                            const aName = String(a.name || '').trim().toLowerCase();
+                            return (aName.includes(baseAdName) || baseAdName.includes(aName)) && a.adset_id === liveAdSet.id;
+                        });
+                    }
+
+                    // 4순위: 해당 광고 세트 내에 등록된 광고(Ad) 세팅값 자동 연결 Fallback
                     if (!liveAd && liveAdSet.id) {
                         const adsetAds = cache.ads.filter((a: any) => a.adset_id === liveAdSet.id);
-                        if (adsetAds.length === 1) {
+                        if (adsetAds.length > 0) {
                             liveAd = adsetAds[0];
                         }
+                    }
+
+                    // 5순위: 계정 전체 소재명 유연 탐색 Fallback
+                    if (!liveAd && baseAdName) {
+                        liveAd = cache.ads.find((a: any) => {
+                            const aName = String(a.name || '').trim().toLowerCase();
+                            return aName.includes(baseAdName) || baseAdName.includes(aName);
+                        });
                     }
                     
                     if (!liveAd) {
@@ -794,18 +812,24 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                         const cleanText = (t: string) => String(t || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
 
                         const liveHeadline = 
+                            creative.title || 
+                            spec.link_data?.title || 
                             spec.link_data?.name || 
                             spec.video_data?.title || 
+                            spec.video_data?.call_to_action?.value?.title ||
                             creative.asset_feed_spec?.titles?.[0]?.text || 
                             '';
 
                         const liveBodyCopy = 
+                            creative.body || 
                             spec.link_data?.message || 
                             spec.video_data?.message || 
+                            spec.photo_data?.message ||
                             creative.asset_feed_spec?.bodies?.[0]?.text || 
                             '';
 
                         const liveCTA = 
+                            creative.call_to_action_type ||
                             spec.link_data?.call_to_action?.type || 
                             spec.video_data?.call_to_action?.type || 
                             creative.asset_feed_spec?.call_to_action_types?.[0] || 
