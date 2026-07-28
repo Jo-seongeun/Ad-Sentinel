@@ -141,12 +141,43 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                 );
                 const adsetData = await adsetRes.json();
 
-                // Fetch Ads for URL & UTM checking (including all creative details matching fetch_meta_insights_debug.py)
+                // 1차: Fetch Basic Ads List
                 const adsRes = await fetch(
-                    `https://graph.facebook.com/v19.0/act_${act}/ads?fields=name,adset_id,creative{id,name,title,body,call_to_action_type,url_tags,object_story_spec,asset_feed_spec,degrees_of_freedom_spec},status&limit=500&access_token=${token}`,
+                    `https://graph.facebook.com/v19.0/act_${act}/ads?fields=id,name,adset_id,creative{id},status&limit=500&access_token=${token}`,
                     { cache: 'no-store' }
                 );
-                const adsData = await adsRes.json();
+                const adsJson = await adsRes.json();
+                const rawAds = adsJson.data || [];
+
+                // 2차: Collect Creative IDs and Batch Direct Query (matching fetch_meta_insights_debug.py)
+                const creativeIds = Array.from(new Set(rawAds.map((a: any) => a.creative?.id).filter(Boolean)));
+                const creativeMap: Record<string, any> = {};
+
+                if (creativeIds.length > 0) {
+                    const batchSize = 50;
+                    for (let i = 0; i < creativeIds.length; i += batchSize) {
+                        const batch = creativeIds.slice(i, i + batchSize);
+                        const idsStr = batch.join(',');
+                        const batchRes = await fetch(
+                            `https://graph.facebook.com/v19.0/?ids=${idsStr}&fields=id,name,title,body,call_to_action_type,url_tags,object_story_spec,asset_feed_spec,degrees_of_freedom_spec&access_token=${token}`,
+                            { cache: 'no-store' }
+                        );
+                        const batchData = await batchRes.json();
+                        if (batchData && !batchData.error) {
+                            Object.assign(creativeMap, batchData);
+                        }
+                    }
+                }
+
+                // 3차: Combine Full Creative Details into Ads
+                const enrichedAds = rawAds.map((a: any) => {
+                    const cId = a.creative?.id;
+                    const fullCreative = cId ? (creativeMap[cId] || a.creative) : a.creative;
+                    return {
+                        ...a,
+                        creative: fullCreative
+                    };
+                });
 
                 // Fetch Account Currency
                 const accRes = await fetch(
@@ -155,7 +186,7 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                 );
                 const accData = await accRes.json();
 
-                liveMetaCache[act] = { adsets: adsetData.data || [], ads: adsData.data || [], currency: accData.currency || 'KRW' };
+                liveMetaCache[act] = { adsets: adsetData.data || [], ads: enrichedAds, currency: accData.currency || 'KRW' };
             } catch (error) {
                 console.error(`Meta API Error for Act ${act}:`, error);
                 liveMetaCache[act] = { adsets: [], ads: [] };
@@ -624,8 +655,10 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                         fieldDiffs['Headline'] = { excelVal: row.Headline || '-', apiVal: '미확인', matched: false };
                         fieldDiffs['BodyCopy'] = { excelVal: row.BodyCopy || '-', apiVal: '미확인', matched: false };
                         fieldDiffs['CTA'] = { excelVal: row.CTA || '-', apiVal: '미확인', matched: false };
-                        if (row.AdName) {
-                            errors.push(`매체에 일치하는 광고가 없음 (${row.AdName})`);
+                        
+                        // 기획안 데이터(소재명, 헤드라인, 본문, URL, UTM 등)가 존재함에도 라이브 광고를 매칭하지 못한 경우 ➔ 무조건 FAIL!
+                        if (row.AdName || row.Headline || row.BodyCopy || row.LandingURL || row.UTMParameters) {
+                            errors.push(`매체에 일치하는 광고 소재 데이터를 찾을 수 없음 (${row.AdName || '소재명 미입력'})`);
                             status = 'FAIL';
                         }
                     } else {
