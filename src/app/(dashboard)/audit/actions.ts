@@ -352,7 +352,8 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
         }
 
         if (status !== 'FAIL' && token && row.Platform.toUpperCase() === 'META') {
-            const cache = liveMetaCache[row.AccountID];
+            const cleanActId = String(row.AccountID || '').replace(/[^0-9]/g, '').trim();
+            const cache = liveMetaCache[cleanActId] || liveMetaCache[row.AccountID];
             if (cache) {
                 const safeName = String(row.AdSetName || '').replace(/\s+/g, '').toLowerCase();
                 const safeCampName = String(row.CampaignName || '').replace(/\s+/g, '').toLowerCase();
