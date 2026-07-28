@@ -141,13 +141,23 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                 );
                 const adsetData = await adsetRes.json();
 
-                // 1차: Fetch Basic Ads List
+                // 1차: Fetch Basic Ads List (including ALL statuses: ACTIVE, PAUSED, CAMPAIGN_PAUSED, etc.)
                 const adsRes = await fetch(
-                    `https://graph.facebook.com/v19.0/act_${act}/ads?fields=id,name,adset_id,creative{id},status&limit=500&access_token=${token}`,
+                    `https://graph.facebook.com/v19.0/act_${act}/ads?fields=id,name,adset_id,creative{id},status,effective_status&filtering=[{"field":"effective_status","operator":"IN","value":["ACTIVE","PAUSED","PENDING_REVIEW","DISAPPROVED","PREAPPROVED","IN_PROCESS","WITH_ISSUES","CAMPAIGN_PAUSED","ADSET_PAUSED","ARCHIVED"]}]&limit=1000&access_token=${token}`,
                     { cache: 'no-store' }
                 );
                 const adsJson = await adsRes.json();
-                const rawAds = adsJson.data || [];
+                let rawAds = adsJson.data || [];
+
+                // Fallback: If filtering returns empty, fetch default limit=1000
+                if (rawAds.length === 0) {
+                    const fallbackRes = await fetch(
+                        `https://graph.facebook.com/v19.0/act_${act}/ads?fields=id,name,adset_id,creative{id},status,effective_status&limit=1000&access_token=${token}`,
+                        { cache: 'no-store' }
+                    );
+                    const fallbackJson = await fallbackRes.json();
+                    rawAds = fallbackJson.data || [];
+                }
 
                 // 2차: Collect Creative IDs and Batch Direct Query (matching fetch_meta_insights_debug.py)
                 const creativeIds = Array.from(new Set(rawAds.map((a: any) => a.creative?.id).filter(Boolean)));
@@ -698,7 +708,18 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                             status = 'FAIL';
                         }
                     } else {
-                        fieldDiffs['AdName'] = { excelVal: row.AdName || '-', apiVal: liveAd.name || row.AdName, matched: true };
+                        const isAdNameMatched = Boolean(row.AdName && liveAd.name && String(row.AdName).trim() === String(liveAd.name).trim());
+                        fieldDiffs['AdName'] = { 
+                            excelVal: row.AdName || '-', 
+                            apiVal: liveAd.name || '-', 
+                            matched: isAdNameMatched,
+                            message: isAdNameMatched ? undefined : '광고 소재명 불일치 (서픽스/명칭 상이)'
+                        };
+                        if (row.AdName && !isAdNameMatched) {
+                            errors.push(`광고 소재명 불일치 (기획안: ${row.AdName}, 매체: ${liveAd.name || '미세팅'})`);
+                            status = 'FAIL';
+                        }
+
                         const creative = liveAd.creative || {};
                         const spec = creative.object_story_spec || {};
                         
