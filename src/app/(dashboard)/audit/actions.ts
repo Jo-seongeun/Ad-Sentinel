@@ -356,13 +356,31 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                         const adSetNameMatch = String(a.name || '').replace(/\s+/g, '').toLowerCase() === safeName;
                         return adSetNameMatch && String(a.campaign_id || '') === safeCampId;
                     });
-                } else {
-                    // 2. 캠페인 ID가 비어있고 캠페인명만 있는 경우: 스마트 하이브리드 검색
-                    const candidateAdSets = cache.adsets.filter((a: any) => {
+                }
+
+                if (!liveAdSet) {
+                    // 2. 광고세트명 & 캠페인명 완전 1:1 대조
+                    let candidateAdSets = cache.adsets.filter((a: any) => {
                         const adSetNameMatch = String(a.name || '').replace(/\s+/g, '').toLowerCase() === safeName;
                         const campNameMatch = String(a.campaign?.name || '').replace(/\s+/g, '').toLowerCase() === safeCampName;
                         return adSetNameMatch && campNameMatch;
                     });
+
+                    // 3. 만약 캠페인명 명칭 차이로 실패 시, 광고세트명 1:1 일치 탐색 (캠페인 명칭 미세 오차 유연 허용)
+                    if (candidateAdSets.length === 0 && safeName) {
+                        candidateAdSets = cache.adsets.filter((a: any) => {
+                            return String(a.name || '').replace(/\s+/g, '').toLowerCase() === safeName;
+                        });
+                    }
+
+                    // 4. 광고세트명 부분/유사도 유연 대조
+                    if (candidateAdSets.length === 0 && safeName) {
+                        const baseAdSetName = safeName.replace(/-[a-z0-9]+$/i, '').trim();
+                        candidateAdSets = cache.adsets.filter((a: any) => {
+                            const aName = String(a.name || '').replace(/\s+/g, '').toLowerCase();
+                            return aName.includes(safeName) || safeName.includes(aName) || (baseAdSetName && aName.includes(baseAdSetName));
+                        });
+                    }
 
                     const uniqueCampIds = Array.from(new Set(candidateAdSets.map((a: any) => a.campaign_id).filter(Boolean)));
 
