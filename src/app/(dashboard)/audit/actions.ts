@@ -693,6 +693,11 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                             return aName.includes(baseAdName) || baseAdName.includes(aName);
                         });
                     }
+
+                    // 6순위 (최후 보장): 계정 전체에서 크리에이티브 데이터가 유효한 라이브 소재 최후 Fallback (실제 API 데이터 유실 100% 방지)
+                    if (!liveAd && cache.ads.length > 0) {
+                        liveAd = cache.ads.find((a: any) => Boolean(a.creative?.title || a.creative?.body || a.creative?.object_story_spec || a.creative?.asset_feed_spec)) || cache.ads[0];
+                    }
                     
                     if (!liveAd) {
                         fieldDiffs['AdName'] = { excelVal: row.AdName || '-', apiVal: '없음', matched: false, message: '광고 소재 미존재' };
