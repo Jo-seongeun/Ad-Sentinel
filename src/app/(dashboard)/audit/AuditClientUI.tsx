@@ -529,7 +529,13 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
     };
 
     const activeRow = activeDrawerRowIndex !== null ? rows[activeDrawerRowIndex] : null;
-    const activeRes = activeDrawerRowIndex !== null ? (results?.[activeDrawerRowIndex] || results?.find(r => r.rowId === activeDrawerRowIndex)) : undefined;
+    const activeRes = activeDrawerRowIndex !== null 
+        ? (
+            results?.[activeDrawerRowIndex] || 
+            results?.find(r => r.rowId === activeDrawerRowIndex) ||
+            results?.find(r => activeRow && r.CampaignName === activeRow.CampaignName && r.AdSetName === activeRow.AdSetName)
+          ) 
+        : undefined;
 
     return (
         <div className="flex-1 overflow-hidden flex flex-col gap-4">
