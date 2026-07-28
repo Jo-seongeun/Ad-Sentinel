@@ -417,6 +417,40 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                     errors.push('매체에 일치하는 광고 세트가 없음');
                     status = 'FAIL';
                     fieldDiffs['AdSetName'] = { excelVal: row.AdSetName, apiVal: '없음', matched: false, message: '광고 세트 미존재' };
+
+                    // ⚠️ 광고 세트를 매칭하지 못했더라도, 소재(Ad) 레벨 크리에이티브 데이터는 계정 전체에서 탐색하여 모달에 표출
+                    if (row.AdName || row.Headline || row.BodyCopy) {
+                        const safeAdNameFallback = String(row.AdName || '').trim().toLowerCase();
+                        const baseAdNameFallback = safeAdNameFallback.replace(/-[a-z0-9]+$/i, '').trim();
+                        let fallbackAd = cache.ads.find((a: any) => String(a.name || '').trim().toLowerCase() === safeAdNameFallback);
+                        if (!fallbackAd && baseAdNameFallback) {
+                            fallbackAd = cache.ads.find((a: any) => {
+                                const n = String(a.name || '').trim().toLowerCase();
+                                return n.includes(baseAdNameFallback) || baseAdNameFallback.includes(n);
+                            });
+                        }
+                        if (!fallbackAd && cache.ads.length > 0) {
+                            fallbackAd = cache.ads.find((a: any) => Boolean(a.creative?.title || a.creative?.body)) || cache.ads[0];
+                        }
+                        if (fallbackAd) {
+                            const fc = fallbackAd.creative || {};
+                            const fSpec = fc.object_story_spec || {};
+                            const fLinkData = fSpec.link_data || fSpec.video_data || {};
+                            const liveHeadlineFb = fc.title || fLinkData.name || fc.asset_feed_spec?.titles?.[0]?.text || '';
+                            const liveBodyFb = fc.body || fLinkData.message || fc.asset_feed_spec?.bodies?.[0]?.text || '';
+                            const liveCTAFb = fc.call_to_action_type || fLinkData.call_to_action?.type || '';
+                            const liveLandingFb = fLinkData.call_to_action?.value?.link || fLinkData.link || '';
+                            const liveUtmFb = fc.url_tags || '';
+                            const cleanTextFb = (t: string) => String(t || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+
+                            fieldDiffs['Headline'] = { excelVal: row.Headline || '-', apiVal: liveHeadlineFb || '-', matched: Boolean(liveHeadlineFb && cleanTextFb(liveHeadlineFb) === cleanTextFb(row.Headline)) };
+                            fieldDiffs['BodyCopy'] = { excelVal: row.BodyCopy || '-', apiVal: liveBodyFb || '-', matched: Boolean(liveBodyFb && cleanTextFb(liveBodyFb) === cleanTextFb(row.BodyCopy)) };
+                            fieldDiffs['CTA'] = { excelVal: row.CTA || '-', apiVal: liveCTAFb || '-', matched: Boolean(!row.CTA || liveCTAFb === row.CTA) };
+                            fieldDiffs['LandingURL'] = { excelVal: row.LandingURL || '-', apiVal: liveLandingFb || '-', matched: Boolean(!row.LandingURL || liveLandingFb === row.LandingURL) };
+                            fieldDiffs['UTMParameters'] = { excelVal: row.UTMParameters || '-', apiVal: liveUtmFb || '-', matched: Boolean(!row.UTMParameters || liveUtmFb.includes(row.UTMParameters)) };
+                            fieldDiffs['AdName'] = { excelVal: row.AdName || '-', apiVal: fallbackAd.name || '-', matched: String(row.AdName || '').trim() === String(fallbackAd.name || '').trim() };
+                        }
+                    }
                 } else {
                     fieldDiffs['AdSetName'] = { excelVal: row.AdSetName, apiVal: liveAdSet.name || row.AdSetName, matched: true };
 

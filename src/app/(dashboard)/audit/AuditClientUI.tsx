@@ -375,6 +375,12 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
         try {
             // Call server action to crosscheck Live API
             const auditRes = await crosscheckApiAction(rows);
+            // DEBUG: Log the first result's fieldDiffs to see what came back from server
+            if (auditRes && auditRes.length > 0) {
+                console.log('[DEBUG] auditRes[0].status:', auditRes[0].status);
+                console.log('[DEBUG] auditRes[0].fieldDiffs:', JSON.stringify(auditRes[0].fieldDiffs, null, 2));
+                console.log('[DEBUG] auditRes[0].errors:', auditRes[0].errors);
+            }
             setResults(auditRes);
         } catch (error) {
             console.error('Audit Error:', error);
