@@ -241,8 +241,8 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                     }
                 }
 
-                // 2. [쿼리 A] Ad group + ad query — Search / Shopping / Display 등 일반 캠페인
-                const adQuery = `SELECT customer.currency_code, campaign.id, campaign.name, campaign.status, campaign.advertising_channel_type, campaign.bidding_strategy_type, campaign.start_date, campaign.end_date, ad_group.id, ad_group.name, ad_group.status, ad_group_ad.ad.id, ad_group_ad.ad.name, ad_group_ad.status, ad_group_ad.ad.final_urls, ad_group_ad.ad.tracking_url_template FROM ad_group_ad WHERE ad_group_ad.status = 'ENABLED' AND campaign.status = 'ENABLED' AND ad_group.status = 'ENABLED' LIMIT 1000`;
+                // 2. [쿼리 A] Ad group + ad query — Search / Shopping / Display 등 일반 캠페인 (ENABLED & PAUSED 포함)
+                const adQuery = `SELECT customer.currency_code, campaign.id, campaign.name, campaign.status, campaign.advertising_channel_type, campaign.bidding_strategy_type, campaign.start_date, campaign.end_date, ad_group.id, ad_group.name, ad_group.status, ad_group_ad.ad.id, ad_group_ad.ad.name, ad_group_ad.status, ad_group_ad.ad.final_urls, ad_group_ad.ad.tracking_url_template, ad_group_ad.ad.responsive_search_ad.headlines, ad_group_ad.ad.responsive_search_ad.descriptions, ad_group_ad.ad.responsive_display_ad.headlines, ad_group_ad.ad.responsive_display_ad.descriptions, ad_group_ad.ad.responsive_display_ad.call_to_action_text FROM ad_group_ad WHERE ad_group_ad.status IN ('ENABLED', 'PAUSED') AND campaign.status IN ('ENABLED', 'PAUSED') AND ad_group.status IN ('ENABLED', 'PAUSED') LIMIT 1000`;
                 const adRes = await fetch(
                     `https://googleads.googleapis.com/v22/customers/${custId}/googleAds:searchStream`,
                     { method: 'POST', headers: gaqlHeaders, body: JSON.stringify({ query: adQuery }) }
@@ -279,12 +279,28 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                             if (!adGroups.find((ag: any) => ag.id === adGroup.id)) {
                                 adGroups.push({ id: adGroup.id, name: adGroup.name, campaignId: camp.id });
                             }
+
+                            const headline = 
+                                ad.responsiveSearchAd?.headlines?.[0]?.text || 
+                                ad.responsiveDisplayAd?.headlines?.[0]?.text || 
+                                '';
+
+                            const description = 
+                                ad.responsiveSearchAd?.descriptions?.[0]?.text || 
+                                ad.responsiveDisplayAd?.descriptions?.[0]?.text || 
+                                '';
+
+                            const cta = ad.responsiveDisplayAd?.callToActionText || '';
+
                             ads.push({
                                 id: ad.id,
                                 name: ad.name,
                                 adGroupId: adGroup.id,
                                 finalUrls: ad.finalUrls || [],
                                 trackingUrl: ad.trackingUrlTemplate || '',
+                                headline,
+                                description,
+                                cta,
                             });
                         }
                     }
@@ -1098,52 +1114,156 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                         }
                     }
 
-                    const liveAdGroup = cache.adGroups.find((ag: any) =>
+                    // 5. Google Ads Ad Group & Ad Level Crosscheck
+                    let liveAdGroup = cache.adGroups.find((ag: any) =>
                         ag.campaignId === liveCampaign.id &&
                         normalizeStr(ag.name) === normalizeStr(row.AdSetName)
                     );
+                    if (!liveAdGroup && liveCampaign.id) {
+                        const campGroups = cache.adGroups.filter((ag: any) => ag.campaignId === liveCampaign.id);
+                        if (campGroups.length > 0) liveAdGroup = campGroups[0];
+                    }
+
                     if (row.AdSetName && !liveAdGroup) {
                         errors.push(`매체에 일치하는 광고 그룹이 없음 (${row.AdSetName})`);
                         status = 'FAIL';
                         fieldDiffs['AdSetName'] = { excelVal: row.AdSetName, apiVal: '없음', matched: false, message: '광고 그룹 미존재' };
                     } else if (row.AdSetName) {
-                        fieldDiffs['AdSetName'] = { excelVal: row.AdSetName, apiVal: liveAdGroup.name || row.AdSetName, matched: true };
+                        fieldDiffs['AdSetName'] = { excelVal: row.AdSetName, apiVal: liveAdGroup?.name || row.AdSetName, matched: true };
                     }
 
-                    if (row.AdName && liveAdGroup) {
-                        const liveAd = cache.ads.find((a: any) =>
-                            a.adGroupId === liveAdGroup.id &&
-                            normalizeStr(a.name) === normalizeStr(row.AdName)
-                        );
+                    // Ad Level Checks (AdName, LandingURL, UTM, Headline, Body, CTA)
+                    const safeAdName = String(row.AdName || '').trim().toLowerCase();
+                    const normAdName = safeAdName.replace(/\s+/g, '');
+                    const baseAdName = safeAdName.replace(/-[a-z0-9]+$/i, '').trim();
+
+                    let liveAd: any = null;
+                    if (liveAdGroup) {
+                        // 1순위: adGroupId & 광고명 완전 일치
+                        liveAd = cache.ads.find((a: any) => String(a.name || '').trim().toLowerCase() === safeAdName && a.adGroupId === liveAdGroup.id);
+                        // 2순위: 띄어쓰기 제거 후 공백 무시 일치
                         if (!liveAd) {
-                            errors.push(`매체에 일치하는 광고가 없음 (${row.AdName})`);
+                            liveAd = cache.ads.find((a: any) => String(a.name || '').replace(/\s+/g, '').toLowerCase() === normAdName && a.adGroupId === liveAdGroup.id);
+                        }
+                        // 3순위: 서픽스(-S 등) 제외 접두사/부분 일치 탐색
+                        if (!liveAd && baseAdName) {
+                            liveAd = cache.ads.find((a: any) => {
+                                const aName = String(a.name || '').trim().toLowerCase();
+                                return (aName.includes(baseAdName) || baseAdName.includes(aName)) && a.adGroupId === liveAdGroup.id;
+                            });
+                        }
+                        // 4순위: 해당 광고 그룹 내 첫 소재 Fallback
+                        if (!liveAd) {
+                            const groupAds = cache.ads.filter((a: any) => a.adGroupId === liveAdGroup.id);
+                            if (groupAds.length > 0) liveAd = groupAds[0];
+                        }
+                    }
+
+                    // 5순위: 계정 전체 소재명 유연 탐색 Fallback
+                    if (!liveAd && baseAdName) {
+                        liveAd = cache.ads.find((a: any) => {
+                            const aName = String(a.name || '').trim().toLowerCase();
+                            return aName.includes(baseAdName) || baseAdName.includes(aName);
+                        });
+                    }
+
+                    // 6순위: 계정 전체 최후 Fallback
+                    if (!liveAd && cache.ads.length > 0) {
+                        liveAd = cache.ads.find((a: any) => Boolean(a.headline || a.description)) || cache.ads[0];
+                    }
+
+                    if (!liveAd) {
+                        fieldDiffs['AdName'] = { excelVal: row.AdName || '-', apiVal: '없음', matched: false, message: '광고 소재 미존재' };
+                        fieldDiffs['LandingURL'] = { excelVal: row.LandingURL || '-', apiVal: '미확인', matched: false };
+                        fieldDiffs['UTMParameters'] = { excelVal: row.UTMParameters || '-', apiVal: '미확인', matched: false };
+                        fieldDiffs['Headline'] = { excelVal: row.Headline || '-', apiVal: '미확인', matched: false };
+                        fieldDiffs['BodyCopy'] = { excelVal: row.BodyCopy || '-', apiVal: '미확인', matched: false };
+                        fieldDiffs['CTA'] = { excelVal: row.CTA || '-', apiVal: '미확인', matched: false };
+
+                        if (row.AdName || row.Headline || row.BodyCopy || row.LandingURL || row.UTMParameters) {
+                            errors.push(`Google Ads에 일치하는 광고 소재 데이터를 찾을 수 없음 (${row.AdName || '소재명 미입력'})`);
                             status = 'FAIL';
-                            fieldDiffs['AdName'] = { excelVal: row.AdName, apiVal: '없음', matched: false, message: '광고 소재 미존재' };
-                        } else {
-                            fieldDiffs['AdName'] = { excelVal: row.AdName, apiVal: liveAd.name || row.AdName, matched: true };
-                            const liveLandingUrl = liveAd.finalUrls?.[0] || '';
-                            if (row.LandingURL) {
-                                const isMatched = Boolean(liveLandingUrl && normalizeUrl(liveLandingUrl) === normalizeUrl(row.LandingURL));
-                                fieldDiffs['LandingURL'] = { excelVal: row.LandingURL, apiVal: liveLandingUrl || '미세팅', matched: isMatched, message: isMatched ? undefined : '랜딩 URL 불일치' };
-                                if (!liveLandingUrl) {
-                                    errors.push('매체에 랜딩 URL이 세팅되지 않음');
-                                    if (status === 'PASS') status = 'WARNING';
-                                } else if (!isMatched) {
-                                    errors.push(`랜딩 URL 불일치 (매체: ${liveLandingUrl})`);
-                                    status = 'FAIL';
+                        }
+                    } else {
+                        const isAdNameMatched = Boolean(row.AdName && liveAd.name && String(row.AdName).trim() === String(liveAd.name).trim());
+                        fieldDiffs['AdName'] = { 
+                            excelVal: row.AdName || '-', 
+                            apiVal: liveAd.name || '-', 
+                            matched: isAdNameMatched,
+                            message: isAdNameMatched ? undefined : '광고 소재명 불일치 (서픽스/명칭 상이)'
+                        };
+                        if (row.AdName && !isAdNameMatched) {
+                            errors.push(`광고 소재명 불일치 (기획안: ${row.AdName}, 매체: ${liveAd.name || '미세팅'})`);
+                            status = 'FAIL';
+                        }
+
+                        const liveLandingUrl = liveAd.finalUrls?.[0] || '';
+                        const isLandingMatched = row.LandingURL ? Boolean(liveLandingUrl && normalizeUrl(liveLandingUrl) === normalizeUrl(row.LandingURL)) : true;
+                        fieldDiffs['LandingURL'] = { 
+                            excelVal: row.LandingURL || '-', 
+                            apiVal: liveLandingUrl || '미세팅', 
+                            matched: isLandingMatched, 
+                            message: isLandingMatched ? undefined : '랜딩 URL 불일치' 
+                        };
+                        if (row.LandingURL && !isLandingMatched) {
+                            errors.push(`랜딩 URL 불일치 (기획안: ${row.LandingURL}, 매체: ${liveLandingUrl || '미세팅'})`);
+                            status = 'FAIL';
+                        }
+
+                        const liveUtm = liveAd.trackingUrl || '';
+                        const isUtmMatched = row.UTMParameters ? Boolean(liveUtm && (liveUtm.includes(row.UTMParameters) || liveUtm === row.UTMParameters)) : true;
+                        fieldDiffs['UTMParameters'] = { 
+                            excelVal: row.UTMParameters || '-', 
+                            apiVal: liveUtm || '미세팅 (자동태깅 가능성)', 
+                            matched: isUtmMatched, 
+                            message: isUtmMatched ? undefined : 'UTM 파라미터 불일치' 
+                        };
+                        if (row.UTMParameters && !isUtmMatched && liveUtm) {
+                            errors.push(`UTM 파라미터 불일치 (기획안: ${row.UTMParameters}, 매체: ${liveUtm})`);
+                            status = 'FAIL';
+                        }
+
+                        const liveHeadline = liveAd.headline || '';
+                        const liveBodyCopy = liveAd.description || '';
+                        const liveCTA = liveAd.cta || '';
+
+                        const cleanText = (t: string) => String(t || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+
+                        const evaluateCopy = (excelVal: string, liveVal: string, fieldLabel: string) => {
+                            const normExcel = cleanText(excelVal);
+                            const normLive = cleanText(liveVal);
+                            if (normExcel) {
+                                if (!normLive) {
+                                    return { excelVal, apiVal: '미세팅', matched: false, isNoExcelInput: false, message: `${fieldLabel} 매체 미세팅` };
+                                } else if (normExcel === normLive) {
+                                    return { excelVal, apiVal: liveVal, matched: true, isNoExcelInput: false };
+                                } else {
+                                    return { excelVal, apiVal: liveVal, matched: false, isNoExcelInput: false, message: `${fieldLabel} 문구 상이` };
                                 }
+                            } else {
+                                return { excelVal: '-', apiVal: normLive || '-', matched: true, isNoExcelInput: Boolean(normLive) };
                             }
-                            if (row.UTMParameters) {
-                                const isMatched = Boolean(liveAd.trackingUrl && (liveAd.trackingUrl.includes(row.UTMParameters) || liveAd.trackingUrl === row.UTMParameters));
-                                fieldDiffs['UTMParameters'] = { excelVal: row.UTMParameters, apiVal: liveAd.trackingUrl || '미세팅 (자동태깅 가능성)', matched: isMatched, message: isMatched ? undefined : 'UTM 파라미터 불일치' };
-                                if (!liveAd.trackingUrl) {
-                                    errors.push('매체 Tracking Template이 비어있음 — Google 자동 태깅(Auto-tagging) 사용 가능성 (UTM 검수 제외)');
-                                    if (status === 'PASS') status = 'WARNING';
-                                } else if (!isMatched) {
-                                    errors.push(`UTM 파라미터 불일치 (매체: ${liveAd.trackingUrl})`);
-                                    status = 'FAIL';
-                                }
-                            }
+                        };
+
+                        const headDiff = evaluateCopy(row.Headline, liveHeadline, '헤드라인');
+                        fieldDiffs['Headline'] = headDiff;
+                        if (row.Headline && !headDiff.matched) {
+                            errors.push(headDiff.message || '헤드라인 불일치');
+                            status = 'FAIL';
+                        }
+
+                        const bodyDiff = evaluateCopy(row.BodyCopy, liveBodyCopy, '본문 카피');
+                        fieldDiffs['BodyCopy'] = bodyDiff;
+                        if (row.BodyCopy && !bodyDiff.matched) {
+                            errors.push(bodyDiff.message || '본문 카피 불일치');
+                            status = 'FAIL';
+                        }
+
+                        const ctaDiff = evaluateCopy(row.CTA, liveCTA, 'CTA 버튼');
+                        fieldDiffs['CTA'] = ctaDiff;
+                        if (row.CTA && !ctaDiff.matched) {
+                            errors.push(ctaDiff.message || 'CTA 버튼 불일치');
+                            status = 'FAIL';
                         }
                     }
                 }

@@ -970,43 +970,58 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Drawer Header */}
-                        <div className="p-5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/90 dark:bg-zinc-900/90">
-                            <div>
-                                <span className={`text-[11px] font-extrabold px-2.5 py-1 rounded-full ${
-                                    viewMode === 'ver1' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300' : 'bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300'
-                                }`}>
-                                    {viewMode === 'ver1' ? '📌 ver1 캠페인 세팅 내역서 정밀 리포트' : '🎨 ver2 소재 참조 세부 내역서 정밀 리포트'}
-                                </span>
-                                <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-50 mt-2 flex items-center gap-2">
-                                    {activeRow.AdName || activeRow.AdSetName}
-                                </h3>
-                                <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate max-w-lg mt-0.5 font-mono">
-                                    캠페인: {activeRow.CampaignName} (계정 ID: {activeRow.AccountID})
-                                </p>
+                        <div className="p-5 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/90 dark:bg-zinc-900/90 space-y-3">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <span className={`text-[11px] font-extrabold px-2.5 py-1 rounded-full ${
+                                        viewMode === 'ver1' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300' : 'bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300'
+                                    }`}>
+                                        {viewMode === 'ver1' ? '📌 ver1 캠페인 세팅 내역서 정밀 리포트' : '🎨 ver2 소재 참조 세부 내역서 정밀 리포트'}
+                                    </span>
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                                        activeRow.Platform?.toLowerCase().includes('google')
+                                            ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300'
+                                            : 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
+                                    }`}>
+                                        {activeRow.Platform || 'Meta'}
+                                    </span>
+                                    <span className="text-xs font-mono text-zinc-400">
+                                        (계정 ID: {activeRow.AccountID})
+                                    </span>
+                                </div>
+                                <button
+                                    onClick={() => setActiveDrawerRowIndex(null)}
+                                    className="p-2 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 rounded-xl hover:bg-zinc-200/50 dark:hover:bg-zinc-800 transition-colors"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
                             </div>
-                            <button
-                                onClick={() => setActiveDrawerRowIndex(null)}
-                                className="p-2 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 rounded-xl hover:bg-zinc-200/50 dark:hover:bg-zinc-800 transition-colors"
-                            >
-                                <X className="w-5 h-5" />
-                            </button>
+
+                            {/* 3단 대조 헤더 타겟 박스 (캠페인명 / 광고 세트명 / 광고명 한눈에 조망) */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 pt-1 text-xs">
+                                <div className="bg-white dark:bg-zinc-800/80 p-2.5 rounded-lg border border-zinc-200/80 dark:border-zinc-700/80 shadow-xs">
+                                    <span className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 block mb-0.5">📢 캠페인명</span>
+                                    <span className="font-semibold text-zinc-800 dark:text-zinc-200 break-words leading-tight block">
+                                        {activeRow.CampaignName || '-'}
+                                    </span>
+                                </div>
+                                <div className="bg-white dark:bg-zinc-800/80 p-2.5 rounded-lg border border-zinc-200/80 dark:border-zinc-700/80 shadow-xs">
+                                    <span className="text-[10px] font-bold text-indigo-500 dark:text-indigo-400 block mb-0.5">📦 광고 세트명</span>
+                                    <span className="font-semibold text-zinc-800 dark:text-zinc-200 break-words leading-tight block">
+                                        {activeRow.AdSetName || '-'}
+                                    </span>
+                                </div>
+                                <div className="bg-white dark:bg-zinc-800/80 p-2.5 rounded-lg border border-purple-200/80 dark:border-purple-900/50 shadow-xs bg-purple-50/30 dark:bg-purple-950/20">
+                                    <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 block mb-0.5">🎨 광고 소재명</span>
+                                    <span className="font-bold text-purple-950 dark:text-purple-200 break-words leading-tight block">
+                                        {activeRow.AdName || '-'}
+                                    </span>
+                                </div>
+                            </div>
                         </div>
 
                         {/* Drawer Body - ver1 vs ver2 탭 모드별 핵심 정보 우선 배치 */}
                         <div className="flex-1 overflow-y-auto p-6 space-y-6">
-
-                            {/* 🔍 TEMPORARY DEBUG PANEL - 서버에서 반환된 실제 데이터 확인 */}
-                            <div className="p-3 rounded-lg bg-yellow-50 dark:bg-yellow-950/40 border border-yellow-300 text-[10px] font-mono space-y-1">
-                                <div className="font-bold text-yellow-800">🔍 [디버그] 서버 반환 데이터 확인 (개발 완료 후 삭제)</div>
-                                <div>activeRes 존재: <b>{String(!!activeRes)}</b></div>
-                                <div>activeRes.status: <b>{activeRes?.status || 'undefined'}</b></div>
-                                <div>fieldDiffs 키 목록: <b>{activeRes?.fieldDiffs ? Object.keys(activeRes.fieldDiffs).join(', ') : 'undefined'}</b></div>
-                                <div>Headline.apiVal: <b className="text-rose-600">{activeRes?.fieldDiffs?.Headline?.apiVal || 'NOT SET'}</b></div>
-                                <div>Headline.excelVal: <b>{activeRes?.fieldDiffs?.Headline?.excelVal || 'NOT SET'}</b></div>
-                                <div>BodyCopy.apiVal: <b className="text-rose-600">{(activeRes?.fieldDiffs?.BodyCopy?.apiVal || 'NOT SET').substring(0, 80)}</b></div>
-                                <div>CTA.apiVal: <b className="text-rose-600">{activeRes?.fieldDiffs?.CTA?.apiVal || 'NOT SET'}</b></div>
-                                <div>errors count: <b>{activeRes?.errors?.length || 0}</b></div>
-                            </div>
 
                             {/* 검수 알림 & 경고 배너 박스 (동명 캠페인 경고 메시지 포함) */}
                             {activeRes?.errors && activeRes.errors.length > 0 && (
