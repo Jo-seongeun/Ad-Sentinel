@@ -580,6 +580,7 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                     if (excelStart && !startMatched) {
                         errors.push(`시작일 불일치 (기획안: ${excelStart}, 매체: ${metaStart})`);
                         status = 'FAIL';
+                    }
                     const metaStop = normalizeDate(liveAdSet.campaign?.stop_time || '');
                     const excelStop = normalizeDate(row.EndDate || '');
                     const stopMatched = !excelStop || metaStop === excelStop || (liveAdSet.campaign?.stop_time && liveAdSet.campaign.stop_time.includes(excelStop));
@@ -968,6 +969,18 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                             }
                         };
 
+                        // 🔍 SERVER DIAGNOSTIC LOG (npm run dev 터미널에서 확인)
+                        if (i < 3) {
+                            console.log(`[DIAG Row ${i}] AdName: ${row.AdName}`);
+                            console.log(`[DIAG Row ${i}] liveAd.name: ${liveAd?.name}`);
+                            console.log(`[DIAG Row ${i}] creative keys: ${Object.keys(creative).join(', ')}`);
+                            console.log(`[DIAG Row ${i}] creative.title: "${creative.title}"`);
+                            console.log(`[DIAG Row ${i}] creative.body: "${(creative.body || '').substring(0, 50)}..."`);
+                            console.log(`[DIAG Row ${i}] spec keys: ${Object.keys(spec).join(', ')}`);
+                            console.log(`[DIAG Row ${i}] liveHeadline: "${liveHeadline}"`);
+                            console.log(`[DIAG Row ${i}] liveBodyCopy: "${(liveBodyCopy || '').substring(0, 50)}..."`);
+                        }
+
                         const headDiff = evaluateCopy(row.Headline, liveHeadline, '헤드라인');
                         fieldDiffs['Headline'] = headDiff;
                         if (row.Headline && !headDiff.matched) {
@@ -991,7 +1004,6 @@ export async function crosscheckApiAction(rows: ParsedRow[]): Promise<AuditResul
                     }
                 }
             }
-        }
         } else if (status !== 'FAIL' && googleAccessToken && row.Platform.toUpperCase().includes('GOOGLE')) {
             // ─── Google Ads Live Crosscheck ───
             const custId = row.AccountID.replace(/-/g, '');

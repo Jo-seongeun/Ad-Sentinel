@@ -995,6 +995,19 @@ export default function AuditClientUI({ teamId, teamName }: { teamId?: string, t
                         {/* Drawer Body - ver1 vs ver2 탭 모드별 핵심 정보 우선 배치 */}
                         <div className="flex-1 overflow-y-auto p-6 space-y-6">
 
+                            {/* 🔍 TEMPORARY DEBUG PANEL - 서버에서 반환된 실제 데이터 확인 */}
+                            <div className="p-3 rounded-lg bg-yellow-50 dark:bg-yellow-950/40 border border-yellow-300 text-[10px] font-mono space-y-1">
+                                <div className="font-bold text-yellow-800">🔍 [디버그] 서버 반환 데이터 확인 (개발 완료 후 삭제)</div>
+                                <div>activeRes 존재: <b>{String(!!activeRes)}</b></div>
+                                <div>activeRes.status: <b>{activeRes?.status || 'undefined'}</b></div>
+                                <div>fieldDiffs 키 목록: <b>{activeRes?.fieldDiffs ? Object.keys(activeRes.fieldDiffs).join(', ') : 'undefined'}</b></div>
+                                <div>Headline.apiVal: <b className="text-rose-600">{activeRes?.fieldDiffs?.Headline?.apiVal || 'NOT SET'}</b></div>
+                                <div>Headline.excelVal: <b>{activeRes?.fieldDiffs?.Headline?.excelVal || 'NOT SET'}</b></div>
+                                <div>BodyCopy.apiVal: <b className="text-rose-600">{(activeRes?.fieldDiffs?.BodyCopy?.apiVal || 'NOT SET').substring(0, 80)}</b></div>
+                                <div>CTA.apiVal: <b className="text-rose-600">{activeRes?.fieldDiffs?.CTA?.apiVal || 'NOT SET'}</b></div>
+                                <div>errors count: <b>{activeRes?.errors?.length || 0}</b></div>
+                            </div>
+
                             {/* 검수 알림 & 경고 배너 박스 (동명 캠페인 경고 메시지 포함) */}
                             {activeRes?.errors && activeRes.errors.length > 0 && (
                                 <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 space-y-2 shadow-xs">
